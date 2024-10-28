@@ -1,0 +1,8 @@
+-e .
+psycopg[binary]
+PyYAML
+aicspylibczi
+opencv-python-headless
+pandas
+pdoc
+pytest
