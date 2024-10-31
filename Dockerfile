@@ -5,7 +5,7 @@
 # Start container to run stuff detached, with a volume mounted, and then delete itself:
 # $ docker run -d --rm -v [HOST_PATH]:[CONTAINER_PATH] csi_images command
 # Interactive example:
-# $ docker run -it --rm --add-host dev-csi-db.usc.edu:10.103.39.193 -v /mnt/HDSCA_Development:/mnt/HDSCA_Development -v /mnt/csidata:/mnt/csidata --entrypoint bash csi_images
+# $ docker run -it --rm -v /mnt/HDSCA_Development:/mnt/HDSCA_Development -v /mnt/csidata:/mnt/csidata --entrypoint bash csi_images
 
 FROM python:3.12-slim-bookworm
 
@@ -28,4 +28,4 @@ COPY tests /$PACKAGE_NAME/tests
 COPY pyproject.toml requirements.txt /$PACKAGE_NAME/
 RUN pip install .
 
-ENTRYPOINT ["bash"]
+ENTRYPOINT [ "bash" ]

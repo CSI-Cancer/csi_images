@@ -4,6 +4,8 @@ in a scan. The module comes with several helper functions that allow for gatheri
 based on their position in the scan.
 """
 
+import typing
+
 from csi_images import csi_scans
 
 
@@ -109,120 +111,123 @@ class Tile:
             raise ValueError(f"Scanner type {self.scan.scanner_id} not supported.")
         return x, y
 
+    @classmethod
+    def get_tiles(
+        cls,
+        scan: csi_scans.Scan,
+        coordinates: list[int] | list[tuple[int, int]] = None,
+        n_roi: int = 0,
+        as_flat: bool = True,
+    ) -> list[typing.Self] | list[list[typing.Self]]:
+        """
+        The simplest way to gather a list of Tile objects. By default, it will gather all
+        tiles in the scan. To gather specific tiles, provide a list of coordinates.
+        :param scan: the scan metadata.
+        :param coordinates: a list of n-based indices or (x, y) coordinates.
+                            Leave as None to include all tiles.
+        :param n_roi: the region of interest to use. Defaults to 0.
+        :param as_flat: whether to return a flat list of Tile objects or a list of lists.
+        :return: if as_flat: a list of Tile objects in the same order as the coordinates;
+                 if not as_flat: a list of lists of Tile objects in their relative coordinates.
+        """
+        if as_flat:
+            if coordinates is None:
+                # Populate coordinates with all n's.
+                coordinates = list(
+                    range(scan.roi[n_roi].tile_rows * scan.roi[n_roi].tile_cols)
+                )
+            tiles = []
+            for coordinate in coordinates:
+                tiles.append(Tile(scan, coordinate, n_roi))
+        else:
+            if coordinates is None:
+                # Populate coordinates with all (x, y) pairs.
+                coordinates = []
+                for y in range(scan.roi[n_roi].tile_rows):
+                    for x in range(scan.roi[n_roi].tile_cols):
+                        coordinates.append((x, y))
+            # Check that the coordinates are contiguous, otherwise we can't make a grid
+            # Find the min and max x, y values
+            x_min = scan.roi[n_roi].tile_cols
+            x_max = 0
+            y_min = scan.roi[n_roi].tile_rows
+            y_max = 0
+            for x, y in coordinates:
+                x_min = min(x_min, x)
+                x_max = max(x_max, x)
+                y_min = min(y_min, y)
+                y_max = max(y_max, y)
 
-def get_tiles(
-    scan: csi_scans.Scan,
-    coordinates: list[int] | list[tuple[int, int]] = None,
-    n_roi: int = 0,
-    as_flat: bool = True,
-) -> list[Tile] | list[list[Tile]]:
-    """
-    The simplest way to gather a list of Tile objects. By default, it will gather all
-    tiles in the scan. To gather specific tiles, provide a list of coordinates.
-    :param scan: the scan metadata.
-    :param coordinates: a list of n-based indices or (x, y) coordinates.
-                        Leave as None to include all tiles.
-    :param n_roi: the region of interest to use. Defaults to 0.
-    :param as_flat: whether to return a flat list of Tile objects or a list of lists.
-    :return: if as_flat: a list of Tile objects in the same order as the coordinates;
-             if not as_flat: a list of lists of Tile objects in their relative coordinates.
-    """
-    if as_flat:
-        if coordinates is None:
-            # Populate coordinates with all n's.
-            coordinates = list(
-                range(scan.roi[n_roi].tile_rows * scan.roi[n_roi].tile_cols)
-            )
-        tiles = []
-        for coordinate in coordinates:
-            tiles.append(Tile(scan, coordinate, n_roi))
-    else:
-        if coordinates is None:
-            # Populate coordinates with all (x, y) pairs.
-            coordinates = []
-            for y in range(scan.roi[n_roi].tile_rows):
-                for x in range(scan.roi[n_roi].tile_cols):
-                    coordinates.append((x, y))
-        # Check that the coordinates are contiguous, otherwise we can't make a grid
-        # Find the min and max x, y values
-        x_min = scan.roi[n_roi].tile_cols
-        x_max = 0
-        y_min = scan.roi[n_roi].tile_rows
-        y_max = 0
-        for x, y in coordinates:
-            x_min = min(x_min, x)
-            x_max = max(x_max, x)
-            y_min = min(y_min, y)
-            y_max = max(y_max, y)
+            # Check that the coordinates are contiguous
+            if (x_max - x_min + 1) * (y_max - y_min + 1) != len(coordinates):
+                raise ValueError(
+                    "Coordinates must be a contiguous square to form "
+                    "a grid; number of coordinates does not match."
+                )
 
-        # Check that the coordinates are contiguous
-        if (x_max - x_min + 1) * (y_max - y_min + 1) != len(coordinates):
-            raise ValueError(
-                "Coordinates must be a contiguous square to form "
-                "a grid; number of coordinates does not match."
-            )
+            tiles = [[None] * (x_max - x_min + 1)] * (y_max - y_min + 1)
+            for coordinate in coordinates:
+                x, y = coordinate
+                tiles[y][x] = Tile(scan, coordinate, n_roi)
 
-        tiles = [[None] * (x_max - x_min + 1)] * (y_max - y_min + 1)
-        for coordinate in coordinates:
-            x, y = coordinate
-            tiles[y][x] = Tile(scan, coordinate, n_roi)
+        return tiles
 
-    return tiles
+    @classmethod
+    def get_tiles_by_row_col(
+        cls,
+        scan: csi_scans.Scan,
+        rows: list[int] = None,
+        cols: list[int] = None,
+        n_roi: int = 0,
+        as_flat: bool = True,
+    ) -> list[typing.Self] | list[list[typing.Self]]:
+        """
+        Gather a list of Tile objects based on the row and column indices provided.
+        If left as None, it will gather all rows and/or columns.
+        :param scan: the scan metadata.
+        :param rows: a list of 0-indexed rows (y-positions) in the scan axes.
+                     Leave as None to include all rows.
+        :param cols: a list of 0-indexed columns (x-positions) in the scan axes.
+                     Leave as None to include all columns.
+        :param n_roi: the region of interest to use. Defaults to 0.
+        :param as_flat: whether to return a flat list of Tile objects or a list of lists.
+        :return: if as_flat: a list of Tile objects in row-major order;
+                 if not as_flat: a list of lists of Tile objects in their relative coordinates
+        """
+        if rows is None:
+            rows = list(range(scan.roi[n_roi].tile_rows))
+        if cols is None:
+            cols = list(range(scan.roi[n_roi].tile_cols))
 
+        # Populate coordinates
+        coordinates = []
+        for row in rows:
+            for col in cols:
+                coordinates.append((col, row))
 
-def get_tiles_by_row_col(
-    scan: csi_scans.Scan,
-    rows: list[int] = None,
-    cols: list[int] = None,
-    n_roi: int = 0,
-    as_flat: bool = True,
-) -> list[Tile] | list[list[Tile]]:
-    """
-    Gather a list of Tile objects based on the row and column indices provided.
-    If left as None, it will gather all rows and/or columns.
-    :param scan: the scan metadata.
-    :param rows: a list of 0-indexed rows (y-positions) in the scan axes.
-                 Leave as None to include all rows.
-    :param cols: a list of 0-indexed columns (x-positions) in the scan axes.
-                 Leave as None to include all columns.
-    :param n_roi: the region of interest to use. Defaults to 0.
-    :param as_flat: whether to return a flat list of Tile objects or a list of lists.
-    :return: if as_flat: a list of Tile objects in row-major order;
-             if not as_flat: a list of lists of Tile objects in their relative coordinates
-    """
-    if rows is None:
-        rows = list(range(scan.roi[n_roi].tile_rows))
-    if cols is None:
-        cols = list(range(scan.roi[n_roi].tile_cols))
+        return Tile.get_tiles(scan, coordinates, n_roi, as_flat)
 
-    # Populate coordinates
-    coordinates = []
-    for row in rows:
-        for col in cols:
-            coordinates.append((col, row))
-
-    return get_tiles(scan, coordinates, n_roi)
-
-
-def get_tiles_by_xy_bounds(
-    scan: csi_scans.Scan,
-    bounds: tuple[int, int, int, int],
-    n_roi: int = 0,
-    as_flat: bool = True,
-) -> list[Tile] | list[list[Tile]]:
-    """
-    Gather a list of Tile objects based on the x, y bounds provided. The bounds are
-    exclusive, like indices, so the tiles at the corners are NOT included in the list.
-    :param scan: the scan metadata.
-    :param bounds: a tuple of (x_0, y_0, x_1, y_1) in the scan axes.
-    :param n_roi: the region of interest to use. Defaults to 0.
-    :param as_flat: whether to return a flat list of Tile objects or a list of lists.
-    :return: if as_flat: a list of Tile objects in row-major order;
-             if not as_flat: a list of lists of Tile objects in their relative coordinates
-    """
-    x_0, y_0, x_1, y_1 = bounds
-    coordinates = []
-    for y in range(y_0, y_1):
-        for x in range(x_0, x_1):
-            coordinates.append((x, y))
-    return get_tiles(scan, coordinates, n_roi)
+    @classmethod
+    def get_tiles_by_xy_bounds(
+        cls,
+        scan: csi_scans.Scan,
+        bounds: tuple[int, int, int, int],
+        n_roi: int = 0,
+        as_flat: bool = True,
+    ) -> list[typing.Self] | list[list[typing.Self]]:
+        """
+        Gather a list of Tile objects based on the x, y bounds provided. The bounds are
+        exclusive, like indices, so the tiles at the corners are NOT included in the list.
+        :param scan: the scan metadata.
+        :param bounds: a tuple of (x_0, y_0, x_1, y_1) in the scan axes.
+        :param n_roi: the region of interest to use. Defaults to 0.
+        :param as_flat: whether to return a flat list of Tile objects or a list of lists.
+        :return: if as_flat: a list of Tile objects in row-major order;
+                 if not as_flat: a list of lists of Tile objects in their relative coordinates
+        """
+        x_0, y_0, x_1, y_1 = bounds
+        coordinates = []
+        for y in range(y_0, y_1):
+            for x in range(x_0, x_1):
+                coordinates.append((x, y))
+        return Tile.get_tiles(scan, coordinates, n_roi, as_flat)

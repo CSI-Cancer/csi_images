@@ -8,12 +8,12 @@ SHOW_PLOTS = False
 def test_getting_frames():
     scan = csi_scans.Scan.load_yaml("tests/data")
     tile = csi_tiles.Tile(scan, 100)
-    frames = csi_frames.get_frames(tile)
+    frames = csi_frames.Frame.get_frames(tile)
     assert len(frames) == 4
-    frames = csi_frames.get_all_frames(scan)
+    frames = csi_frames.Frame.get_all_frames(scan)
     assert len(frames) == scan.roi[0].tile_rows * scan.roi[0].tile_cols
     assert len(frames[0]) == 4
-    frames = csi_frames.get_all_frames(scan, as_flat=False)
+    frames = csi_frames.Frame.get_all_frames(scan, as_flat=False)
     assert len(frames) == scan.roi[0].tile_rows
     assert len(frames[0]) == scan.roi[0].tile_cols
     assert len(frames[0][0]) == 4
@@ -22,7 +22,7 @@ def test_getting_frames():
 def test_making_composite_frames():
     scan = csi_scans.Scan.load_txt("tests/data")
     tile = csi_tiles.Tile(scan, 1000)
-    frames = csi_frames.get_frames(tile)
+    frames = csi_frames.Frame.get_frames(tile)
 
     if SHOW_PLOTS:
         for frame in frames:

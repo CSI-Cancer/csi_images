@@ -13,11 +13,11 @@ def test_getting_event():
         515,
         411,
     )
-    images = event.extract_event_images()
+    images = event.extract_images()
     assert len(images) == 4
-    images = event.extract_event_images(crop_size=100, in_pixels=True)
+    images = event.extract_images(crop_size=100, in_pixels=True)
     assert images[0].shape == (100, 100)
-    images = event.extract_event_images(crop_size=301, in_pixels=True)
+    images = event.extract_images(crop_size=301, in_pixels=True)
     assert images[0].shape == (301, 301)
 
     if SHOW_PLOTS:
@@ -33,11 +33,11 @@ def test_getting_event():
         2,
         1000,
     )
-    images = event.extract_event_images()
+    images = event.extract_images()
     assert len(images) == 4
-    images = event.extract_event_images(crop_size=100, in_pixels=True)
+    images = event.extract_images(crop_size=100, in_pixels=True)
     assert images[0].shape == (100, 100)
-    images = event.extract_event_images(crop_size=301, in_pixels=True)
+    images = event.extract_images(crop_size=301, in_pixels=True)
     assert images[0].shape == (301, 301)
 
     if SHOW_PLOTS:

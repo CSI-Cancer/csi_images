@@ -568,7 +568,7 @@ class Scan(yaml.YAMLObject):
         scan.scan_time_s = 90 * 60  # estimated 90 minutes per scan
         date_as_datetime += datetime.timedelta(seconds=scan.scan_time_s)
         scan.end_date = date_as_datetime.strftime(
-            Scan.DATETIME_FORMAT[cls.Type.AXIOSCAN7]
+            Scan.DATETIME_FORMAT[Scan.Type.AXIOSCAN7]
         )
 
         # Map the raw scanner ID (service ID) to our IDs
@@ -589,13 +589,13 @@ class Scan(yaml.YAMLObject):
         scan.tile_overlap_proportion = 0
 
         # Extract channels and create Channel objects from them
-        for channel in list(cls.BZSCANNER_CHANNEL_MAP.keys()):
+        for channel in list(Scan.BZSCANNER_CHANNEL_MAP.keys()):
             channel_settings = metadata_dict[channel].split(",")
             if channel_settings[0] == "0":
                 continue
             scan.channels.append(
                 Scan.Channel(
-                    name=cls.BZSCANNER_CHANNEL_MAP[channel],
+                    name=Scan.BZSCANNER_CHANNEL_MAP[channel],
                     exposure_ms=float(channel_settings[1]),
                     intensity=float(channel_settings[2]),
                 )
@@ -661,3 +661,18 @@ class Scan(yaml.YAMLObject):
                 f"{input_path}"
             )
         pass
+
+    @classmethod
+    def make_placeholder(
+        cls, slide_id: str, n_tile: int = 2304, n_roi: int = 0
+    ) -> typing.Self:
+        """
+        Make a placeholder Scan object with only basic required information filled in.
+        :param slide_id: the slide ID
+        :return: a Scan object
+        """
+        scan = Scan()
+        scan.slide_id = slide_id
+        scan.roi = [Scan.ROI() for _ in range(n_roi)]
+        scan.roi[0].tile_cols = n_tile
+        return scan

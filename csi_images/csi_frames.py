@@ -6,6 +6,7 @@ composite images from a tile and a set of channels.
 """
 
 import os
+import typing
 
 import cv2
 import numpy as np
@@ -94,49 +95,52 @@ class Frame:
     def _get_jpeg_image(self, input_path: str) -> np.ndarray:
         raise NotImplementedError("JPEG image loading not yet implemented.")
 
-
-def get_frames(tile: csi_tiles.Tile, channels: tuple[int | str] = None) -> list[Frame]:
-    """
-    Get the frames for a tile and a set of channels. By default, gets all channels.
-    :param tile: the tile.
-    :param channels: the channels, as indices or names. Defaults to all channels.
-    :return: the frames, in order of the channels.
-    """
-    if channels is None:
-        channels = range(len(tile.scan.channels))
-    frames = []
-    for channel in channels:
-        frames.append(Frame(tile.scan, tile, channel))
-    return frames
-
-
-def get_all_frames(
-    scan: csi_scans.Scan,
-    channels: tuple[int | str] = None,
-    as_flat: bool = True,
-    n_roi: int = 0,
-) -> list[list[Frame]] | list[list[list[Frame]]]:
-    """
-    Get all frames for a scan and a set of channels.
-    :param scan: the scan metadata.
-    :param channels: the channels, as indices or names. Defaults to all channels.
-    :param n_roi: the region of interest to use. Defaults to 0.
-    :param as_flat: whether to flatten the frames into a 2D list.
-    :return: if as_flat: 2D list of frames, organized as [n][channel];
-             if not as_flat: 3D list of frames organized as [row][col][channel] a.k.a. [y][x][channel].
-    """
-    if as_flat:
+    @classmethod
+    def get_frames(
+        cls, tile: csi_tiles.Tile, channels: tuple[int | str] = None
+    ) -> list[typing.Self]:
+        """
+        Get the frames for a tile and a set of channels. By default, gets all channels.
+        :param tile: the tile.
+        :param channels: the channels, as indices or names. Defaults to all channels.
+        :return: the frames, in order of the channels.
+        """
+        if channels is None:
+            channels = range(len(tile.scan.channels))
         frames = []
-        for n in range(scan.roi[n_roi].tile_rows * scan.roi[n_roi].tile_cols):
-            tile = csi_tiles.Tile(scan, n, n_roi)
-            frames.append(get_frames(tile, channels))
-    else:
-        frames = [[None] * scan.roi[n_roi].tile_cols] * scan.roi[n_roi].tile_rows
-        for x in range(scan.roi[n_roi].tile_cols):
-            for y in range(scan.roi[n_roi].tile_rows):
-                tile = csi_tiles.Tile(scan, (x, y), n_roi)
-                frames[y][x] = get_frames(tile, channels)
-    return frames
+        for channel in channels:
+            frames.append(Frame(tile.scan, tile, channel))
+        return frames
+
+    @classmethod
+    def get_all_frames(
+        cls,
+        scan: csi_scans.Scan,
+        channels: tuple[int | str] = None,
+        n_roi: int = 0,
+        as_flat: bool = True,
+    ) -> list[list[typing.Self]] | list[list[list[typing.Self]]]:
+        """
+        Get all frames for a scan and a set of channels.
+        :param scan: the scan metadata.
+        :param channels: the channels, as indices or names. Defaults to all channels.
+        :param n_roi: the region of interest to use. Defaults to 0.
+        :param as_flat: whether to flatten the frames into a 2D list.
+        :return: if as_flat: 2D list of frames, organized as [n][channel];
+                 if not as_flat: 3D list of frames organized as [row][col][channel] a.k.a. [y][x][channel].
+        """
+        if as_flat:
+            frames = []
+            for n in range(scan.roi[n_roi].tile_rows * scan.roi[n_roi].tile_cols):
+                tile = csi_tiles.Tile(scan, n, n_roi)
+                frames.append(Frame.get_frames(tile, channels))
+        else:
+            frames = [[None] * scan.roi[n_roi].tile_cols] * scan.roi[n_roi].tile_rows
+            for x in range(scan.roi[n_roi].tile_cols):
+                for y in range(scan.roi[n_roi].tile_rows):
+                    tile = csi_tiles.Tile(scan, (x, y), n_roi)
+                    frames[y][x] = Frame.get_frames(tile, channels)
+        return frames
 
 
 def make_rgb_image(

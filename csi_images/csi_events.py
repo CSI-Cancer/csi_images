@@ -9,6 +9,7 @@ csi_utils.csi_scans documentation page for more information on the coordinate sy
 """
 
 import math
+import typing
 
 import numpy as np
 import pandas as pd
@@ -16,6 +17,11 @@ from csi_images import csi_frames, csi_tiles, csi_scans
 
 
 class Event:
+    """
+    A class that represents a single event in a scan, making it easy to evaluate
+    singular events. Required metadata is exposed as attributes, and optional
+    metadata and features are stored as DataFrames.
+    """
 
     # 2D homogenous transformation matrices
     # Translations (final column) are in micrometers (um)
@@ -108,7 +114,7 @@ class Event:
         slide_position = np.matmul(transform, scan_position)
         return float(slide_position[0][0]), float(slide_position[1][0])
 
-    def extract_event_images(
+    def extract_images(
         self, crop_size: int = 10, in_pixels: bool = False
     ) -> list[np.ndarray]:
         """
@@ -120,17 +126,17 @@ class Event:
         :param in_pixels: whether the crop size is in pixels or micrometers. Defaults to um.
         :return: a list of cropped images from the scan in the order of the channels.
         """
-        frames = csi_frames.get_frames(self.tile)
+        frames = csi_frames.Frame.get_frames(self.tile)
         images = [frame.get_image()[0] for frame in frames]
-        return self.crop_images_to_event(images, crop_size, in_pixels)
+        return self.crop_images(images, crop_size, in_pixels)
 
-    def crop_images_to_event(
+    def crop_images(
         self, images: list[np.ndarray], crop_size: int = 10, in_pixels: bool = False
     ) -> list[np.ndarray]:
         """
-        Get the images from the frame images. Called "get" because it does not need to
-        extract anything; it is very quick for extracting multiple events from the
-        same tile.
+        Get the event crops from the frame images. Called "get" because it does not
+        need to extract anything; it is very quick for extracting multiple events from
+        the same tile.
         Use this if you're interested in many events.
         :param images: the frame images.
         :param crop_size: the square size of the image crop to get for this event. Defaults to 10um.
@@ -175,6 +181,147 @@ class Event:
             ] = images[i][bounds[1] : bounds[3], bounds[0] : bounds[2]]
             images[i] = cropped_image
         return images
+
+
+class EventArray:
+    """
+    A class that holds a large number of events' data, making it easy to analyze and
+    manipulate many events at once. A more separated version of the Event class.
+    """
+
+    INFO_COLUMNS = ["slide_id", "tile", "roi", "x", "y", "size"]
+
+    def __init__(
+        self,
+        info: pd.DataFrame = None,
+        features: pd.DataFrame = None,
+        metadata: pd.DataFrame = None,
+    ):
+        # Info must be a DataFrame with columns "slide_id", "tile", "roi", "x", "y", "size"
+        if info is not None and (
+            not all(col in info.columns for col in self.INFO_COLUMNS)
+            or len(info.columns) != 6
+        ):
+            raise ValueError(
+                "EventArray.info must have columns 'slide_id', 'tile', 'roi', 'x', 'y', 'size'"
+            )
+        # All DataFrames must all have the same number of rows
+        if metadata is not None and (info is None or len(info) != len(metadata)):
+            raise ValueError(
+                "If EventArray.metadata is not None, it should match rows with .info"
+            )
+        if features is not None and (info is None or len(info) != len(features)):
+            raise ValueError(
+                "If EventArray.features is not None, it should match rows with .info"
+            )
+        self.info = info
+        self.metadata = metadata
+        self.features = features
+
+    def __len__(self) -> int:
+        # Convenience method to get the number of events
+        return len(self.info)
+
+    def add_metadata(self, new_metadata: pd.DataFrame) -> None:
+        """
+        Add metadata to the EventArray.
+        :param new_metadata: the metadata to add.
+        """
+        if self.metadata is None:
+            if len(self) != len(new_metadata):
+                raise ValueError("New metadata does not match length of existing info")
+            self.metadata = new_metadata
+        else:
+            # Add the new metadata columns to the existing metadata
+            self.metadata = pd.concat([self.metadata, new_metadata], axis=1)
+        self.metadata.reset_index(drop=True, inplace=True)
+
+    @classmethod
+    def from_events(cls, events: list[Event]) -> typing.Self:
+        """
+        Set the events in the EventArray to a new list of events.
+        :param events: the new list of events.
+        """
+        # Return an empty array if we were passed nothing
+        if events is None or len(events) == 0:
+            return EventArray()
+        # Otherwise, grab the info
+        info = pd.DataFrame(
+            {
+                "slide_id": [event.scan.slide_id for event in events],
+                "tile": [event.tile.n for event in events],
+                "roi": [event.tile.n_roi for event in events],
+                "x": [event.x for event in events],
+                "y": [event.y for event in events],
+                "size": [event.size for event in events],
+            }
+        )
+        metadata_list = [event.metadata for event in events]
+        # Iterate through and ensure that all metadata is the same shape
+        for metadata in metadata_list:
+            if type(metadata) != type(metadata_list[0]):
+                raise ValueError("All metadata must be the same type.")
+            if metadata is not None and metadata.shape != metadata_list[0].shape:
+                raise ValueError("All metadata must be the same shape.")
+        if metadata_list[0] is None:
+            metadata = None
+        else:
+            metadata = pd.concat(metadata_list)
+        features_list = [event.features for event in events]
+        # Iterate through and ensure that all features are the same shape
+        for features in features_list:
+            if type(features) != type(features_list[0]):
+                raise ValueError("All features must be the same type.")
+            if features is not None and features.shape != features_list[0].shape:
+                raise ValueError("All features must be the same shape.")
+        if features_list[0] is None:
+            features = None
+        else:
+            features = pd.concat(features_list)
+        return EventArray(info, metadata, features)
+
+    def to_events(
+        self, scans: list[csi_scans.Scan], ignore_missing_scans=True
+    ) -> list[Event]:
+        """
+        Get the events in the EventArray as a list of events.
+        :param scans: the scans that the events belong to.
+        :param ignore_missing_scans: whether to create blank scans for events without scans.
+        :return:
+        """
+        events = []
+        for i in range(len(self.info)):
+            # Determine the associated scan
+            scan = None
+            for s in scans:
+                if s.slide_id == self.info["slide_id"][i]:
+                    scan = s
+                    break
+            if scan is None:
+                if ignore_missing_scans:
+                    # Create a placeholder scan if the scan is missing
+                    scan = csi_scans.Scan.make_placeholder(
+                        self.info["slide_id"][i],
+                        self.info["tile"][i],
+                        self.info["roi"][i],
+                    )
+                else:
+                    raise ValueError(
+                        f"Scan {self.info['slide_id'][i]} not found for event {i}."
+                    )
+            # Add to the list
+            events.append(
+                Event(
+                    scan,
+                    csi_tiles.Tile(scan, self.info["tile"][i], self.info["roi"][i]),
+                    self.info["x"][i],
+                    self.info["y"][i],
+                    size=self.info["size"][i],
+                    metadata=self.metadata.loc[i],
+                    features=self.features.loc[i],
+                )
+            )
+        return events
 
 
 def extract_all_event_images(

@@ -12,7 +12,7 @@ import argparse
 import subprocess
 
 script = """
-source "%s/bin/activate"&&
+source "%s/bin/activate" &&
 pip install pdoc -q &&
 pdoc -t docs/theme -o docs csi_images examples tests &&
 echo "Successfully generated documentation at $(pwd)/docs."
