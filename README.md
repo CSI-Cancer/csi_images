@@ -81,14 +81,14 @@ to [set up an SSH key for GitHub](https://docs.github.com/en/authentication/conn
 ```commandline
 cd ~/path/to/your/repositories
 git clone git@github.com:CSI-Cancer/csi_images.git
-pip install csi_images
+pip install ./csi_images
 ```
 
 Alternatively, you can "editable" install the package, which will allow you to make
 changes to the package and have them reflected in your environment without reinstalling:
 
 ```commandline
-pip install -e .
+pip install -e ./csi_images
 ```
 
 This will add symbolic links to your `site-packages` directory instead of copying the
