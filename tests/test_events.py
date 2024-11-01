@@ -1,4 +1,6 @@
 import cv2
+import pandas as pd
+
 from csi_images import csi_events, csi_tiles, csi_scans
 
 SHOW_PLOTS = False
@@ -109,3 +111,34 @@ def test_event_coordinates_for_axioscan():
     slide_position = event.get_slide_position()
     assert 71000 <= slide_position[0] <= 75000
     assert scan_position[1] == slide_position[1]
+
+
+def test_eventarray_conversions():
+    scan = csi_scans.Scan.load_yaml("tests/data")
+    # Origin
+    tile = csi_tiles.Tile(scan, 0)
+    event0 = csi_events.Event(scan, tile, 0, 0)
+    event1 = csi_events.Event(scan, tile, 1000, 1000)
+    event2 = csi_events.Event(scan, tile, 2000, 2000)
+
+    event_array = csi_events.EventArray.from_events([event0, event1, event2])
+
+    assert len(event_array) == 3
+    assert event_array.metadata is None
+    assert event_array.features is None
+
+    event0.metadata = pd.Series({"event0": 0})
+
+    try:
+        event_array = csi_events.EventArray.from_events([event0, event1, event2])
+        # Should throw error
+        assert False
+    except ValueError:
+        pass
+
+    event1.metadata = pd.Series({"event1": 1})
+    event2.metadata = pd.Series({"event0": 2})
+
+    event_array = csi_events.EventArray.from_events([event0, event1, event2])
+
+    assert len(event_array) == 3

@@ -62,8 +62,8 @@ class Event:
         x: int,
         y: int,
         size: int = 10,  # End-to-end size in pixels
-        metadata: pd.DataFrame = None,
-        features: pd.DataFrame = None,
+        metadata: pd.Series = None,
+        features: pd.Series = None,
     ):
         self.scan = scan
         self.tile = tile
@@ -194,8 +194,8 @@ class EventArray:
     def __init__(
         self,
         info: pd.DataFrame = None,
-        features: pd.DataFrame = None,
         metadata: pd.DataFrame = None,
+        features: pd.DataFrame = None,
     ):
         # Info must be a DataFrame with columns "slide_id", "tile", "roi", "x", "y", "size"
         if info is not None and (
@@ -220,7 +220,10 @@ class EventArray:
 
     def __len__(self) -> int:
         # Convenience method to get the number of events
-        return len(self.info)
+        if self.info is None:
+            return 0
+        else:
+            return len(self.info)
 
     def add_metadata(self, new_metadata: pd.DataFrame) -> None:
         """
@@ -234,7 +237,19 @@ class EventArray:
         else:
             # Add the new metadata columns to the existing metadata
             self.metadata = pd.concat([self.metadata, new_metadata], axis=1)
-        self.metadata.reset_index(drop=True, inplace=True)
+
+    def add_features(self, new_features: pd.DataFrame) -> None:
+        """
+        Add features to the EventArray.
+        :param new_features: the metadata to add.
+        """
+        if self.features is None:
+            if len(self) != len(new_features):
+                raise ValueError("New metadata does not match length of existing info")
+            self.features = new_features
+        else:
+            # Add the new metadata columns to the existing metadata
+            self.features = pd.concat([self.features, new_features], axis=1)
 
     @classmethod
     def from_events(cls, events: list[Event]) -> typing.Self:
@@ -266,7 +281,7 @@ class EventArray:
         if metadata_list[0] is None:
             metadata = None
         else:
-            metadata = pd.concat(metadata_list)
+            metadata = pd.DataFrame(metadata_list)
         features_list = [event.features for event in events]
         # Iterate through and ensure that all features are the same shape
         for features in features_list:
@@ -277,8 +292,8 @@ class EventArray:
         if features_list[0] is None:
             features = None
         else:
-            features = pd.concat(features_list)
-        return EventArray(info, metadata, features)
+            features = pd.DataFrame(features_list)
+        return EventArray(info=info, metadata=metadata, features=features)
 
     def to_events(
         self, scans: list[csi_scans.Scan], ignore_missing_scans=True
@@ -322,6 +337,38 @@ class EventArray:
                 )
             )
         return events
+
+    @classmethod
+    def from_list(cls, events: list[typing.Self]) -> typing.Self:
+        """
+        Combine EventArrays in a list into a single EventArray.
+        :param events: the new list of events.
+        """
+        all_info = []
+        all_metadata = []
+        all_features = []
+        for event_array in events:
+            # Skip empty EventArrays
+            if event_array.info is not None:
+                all_info.append(event_array.info)
+            if event_array.metadata is not None:
+                all_metadata.append(event_array.metadata)
+            if event_array.features is not None:
+                all_features.append(event_array.features)
+        if len(all_info) == 0:
+            return EventArray()
+        else:
+            all_info = pd.concat(all_info, ignore_index=True)
+        if len(all_metadata) == 0:
+            all_metadata = None
+        else:
+            all_metadata = pd.concat(all_metadata, ignore_index=True)
+        if len(all_features) == 0:
+            all_features = None
+        else:
+            all_features = pd.concat(all_features, ignore_index=True)
+
+        return EventArray(all_info, all_metadata, all_features)
 
 
 def extract_all_event_images(
