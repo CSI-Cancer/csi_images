@@ -1,3 +1,5 @@
+import os
+
 import cv2
 import pandas as pd
 
@@ -136,9 +138,23 @@ def test_eventarray_conversions():
     except ValueError:
         pass
 
-    event1.metadata = pd.Series({"event1": 1})
+    event1.metadata = pd.Series({"event0": 1})
     event2.metadata = pd.Series({"event0": 2})
 
     event_array = csi_events.EventArray.from_events([event0, event1, event2])
 
     assert len(event_array) == 3
+
+    events_df = event_array.to_dataframe()
+
+    assert len(events_df) == 3
+
+    assert event_array == csi_events.EventArray.from_dataframe(events_df)
+
+    assert event_array.save_csv("tests/data/events.csv")
+    assert event_array == csi_events.EventArray.load_csv("tests/data/events.csv")
+    os.remove("tests/data/events.csv")
+
+    assert event_array.save_hdf5("tests/data/events.h5")
+    assert event_array == csi_events.EventArray.load_hdf5("tests/data/events.h5")
+    os.remove("tests/data/events.h5")

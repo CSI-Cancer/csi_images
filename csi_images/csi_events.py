@@ -9,10 +9,14 @@ csi_utils.csi_scans documentation page for more information on the coordinate sy
 """
 
 import math
+import os.path
 import typing
+from operator import index
 
 import numpy as np
 import pandas as pd
+import cv2
+
 from csi_images import csi_frames, csi_tiles, csi_scans
 
 
@@ -225,6 +229,46 @@ class EventArray:
         else:
             return len(self.info)
 
+    def __eq__(self, other):
+        is_equal = True
+        # Parse all possibilities for info
+        if isinstance(self.info, pd.DataFrame):
+            if isinstance(other.info, pd.DataFrame):
+                is_equal = self.info.equals(other.info)
+                if not is_equal:
+                    return False
+            else:
+                return False
+        elif self.info is None:
+            if other.info is not None:
+                return False
+
+        # Parse all possibilities for metadata
+        if isinstance(self.metadata, pd.DataFrame):
+            if isinstance(other.metadata, pd.DataFrame):
+                is_equal = self.metadata.equals(other.metadata)
+                if not is_equal:
+                    return False
+            else:
+                return False
+        elif self.metadata is None:
+            if other.metadata is not None:
+                return False
+
+        # Parse all possibilities for features
+        if isinstance(self.features, pd.DataFrame):
+            if isinstance(other.features, pd.DataFrame):
+                is_equal = self.features.equals(other.features)
+                if not is_equal:
+                    return False
+            else:
+                return False
+        elif self.features is None:
+            if other.features is not None:
+                return False
+
+        return is_equal
+
     def add_metadata(self, new_metadata: pd.DataFrame) -> None:
         """
         Add metadata to the EventArray.
@@ -250,6 +294,38 @@ class EventArray:
         else:
             # Add the new metadata columns to the existing metadata
             self.features = pd.concat([self.features, new_features], axis=1)
+
+    @classmethod
+    def from_list(cls, events: list[typing.Self]) -> typing.Self:
+        """
+        Combine EventArrays in a list into a single EventArray.
+        :param events: the new list of events.
+        """
+        all_info = []
+        all_metadata = []
+        all_features = []
+        for event_array in events:
+            # Skip empty EventArrays
+            if event_array.info is not None:
+                all_info.append(event_array.info)
+            if event_array.metadata is not None:
+                all_metadata.append(event_array.metadata)
+            if event_array.features is not None:
+                all_features.append(event_array.features)
+        if len(all_info) == 0:
+            return EventArray()
+        else:
+            all_info = pd.concat(all_info, ignore_index=True)
+        if len(all_metadata) == 0:
+            all_metadata = None
+        else:
+            all_metadata = pd.concat(all_metadata, ignore_index=True)
+        if len(all_features) == 0:
+            all_features = None
+        else:
+            all_features = pd.concat(all_features, ignore_index=True)
+
+        return EventArray(all_info, all_metadata, all_features)
 
     @classmethod
     def from_events(cls, events: list[Event]) -> typing.Self:
@@ -338,37 +414,100 @@ class EventArray:
             )
         return events
 
-    @classmethod
-    def from_list(cls, events: list[typing.Self]) -> typing.Self:
+    def to_dataframe(self) -> pd.DataFrame:
         """
-        Combine EventArrays in a list into a single EventArray.
-        :param events: the new list of events.
+        Convert all the data in the EventArray to a single DataFrame.
+        :return: a DataFrame with all the data in the EventArray.
         """
-        all_info = []
-        all_metadata = []
-        all_features = []
-        for event_array in events:
-            # Skip empty EventArrays
-            if event_array.info is not None:
-                all_info.append(event_array.info)
-            if event_array.metadata is not None:
-                all_metadata.append(event_array.metadata)
-            if event_array.features is not None:
-                all_features.append(event_array.features)
-        if len(all_info) == 0:
-            return EventArray()
-        else:
-            all_info = pd.concat(all_info, ignore_index=True)
-        if len(all_metadata) == 0:
-            all_metadata = None
-        else:
-            all_metadata = pd.concat(all_metadata, ignore_index=True)
-        if len(all_features) == 0:
-            all_features = None
-        else:
-            all_features = pd.concat(all_features, ignore_index=True)
+        # Make a copy of the info DataFrame and prepend "info_" to the column names
+        output = self.info.copy()
+        output.columns = [f"info_{col}" for col in output.columns]
+        # Combine with the metadata and prepend "metadata_" to the column names
+        if self.metadata is not None:
+            metadata = self.metadata.copy()
+            metadata.columns = [f"metadata_{col}" for col in metadata.columns]
+            output = pd.concat([output, metadata], axis=1)
+        # Combine with the features and prepend "features_" to the column names
+        if self.features is not None:
+            features = self.features.copy()
+            features.columns = [f"features_{col}" for col in features.columns]
+            output = pd.concat([output, features], axis=1)
+        return output
 
-        return EventArray(all_info, all_metadata, all_features)
+    @classmethod
+    def from_dataframe(cls, df) -> typing.Self:
+        """
+        From a single, special DataFrame, create an EventArray.
+        :return: a DataFrame with all the data in the EventArray.
+        """
+        # Split the columns into info, metadata, and features and strip prefix
+        info = df[[col for col in df.columns if col.startswith("info_")]].copy()
+        info.columns = [col.replace("info_", "") for col in info.columns]
+        if info.size == 0:
+            info = None
+        metadata = df[[col for col in df.columns if col.startswith("metadata_")]].copy()
+        metadata.columns = [col.replace("metadata_", "") for col in metadata.columns]
+        if metadata.size == 0:
+            metadata = None
+        features = df[[col for col in df.columns if col.startswith("features_")]].copy()
+        features.columns = [col.replace("features_", "") for col in features.columns]
+        if features.size == 0:
+            features = None
+        return cls(info=info, metadata=metadata, features=features)
+
+    def save_csv(self, output_path: str) -> bool:
+        """
+        Save the events to an CSV file, including metadata and features.
+        :param output_path:
+        :return:
+        """
+        self.to_dataframe().to_csv(output_path, index=False)
+        return os.path.exists(output_path)
+
+    @classmethod
+    def load_csv(cls, input_path: str) -> typing.Self:
+        """
+        Load the events from an CSV file, including metadata and features.
+        :param input_path:
+        :return:
+        """
+        # Load the CSV file
+        df = pd.read_csv(input_path)
+        return cls.from_dataframe(df)
+
+    def save_hdf5(self, output_path: str) -> bool:
+        """
+        Save the events to an HDF5 file, including metadata and features.
+        For speed, size, and compatibility with R, we convert all data to numpy arrays
+        and index/colnames to attributes.
+        :param output_path:
+        :return:
+        """
+        # Open the output_path as an HDF5 file
+        with pd.HDFStore(output_path) as store:
+            # Store the dataframes in the HDF5 file
+            if self.info is not None:
+                store.put("info", self.info, index=False)
+            if self.metadata is not None:
+                store.put("metadata", self.metadata, index=False)
+            if self.features is not None:
+                store.put("features", self.features, index=False)
+        return os.path.exists(output_path)
+
+    @classmethod
+    def load_hdf5(cls, input_path: str) -> typing.Self:
+        """
+        Load the events from an HDF5 file, including metadata and features.
+        :param input_path:
+        :return:
+        """
+        # Open the input_path as an HDF5 file
+        with pd.HDFStore(input_path) as store:
+            # Load the dataframes from the HDF5 file
+            info = store.get("info") if "info" in store else None
+            metadata = store.get("metadata") if "metadata" in store else None
+            features = store.get("features") if "features" in store else None
+        return cls(info=info, metadata=metadata, features=features)
 
 
 def extract_all_event_images(
@@ -403,7 +542,7 @@ def extract_all_event_images(
     for i in range(len(events)):
         if last_tile != events[i].tile:
             # Gather the frame images, preserving them for the next event
-            frames = csi_frames.get_frames(events[i].tile)
+            frames = csi_frames.Frame.get_frames(events[i].tile)
             frame_images = [frame.get_image()[0] for frame in frames]
 
             last_tile = events[i].tile
@@ -413,81 +552,3 @@ def extract_all_event_images(
             frame_images, crop_size[i], in_pixels
         )
     return images
-
-
-def get_features_as_dataframe(events: list[Event]) -> pd.DataFrame:
-    """
-    Combine the features of a list of events into a single DataFrame.
-    TODO: test this function
-    :param events: the events to gather features for.
-    :return: a DataFrame with all of the features.
-    """
-
-    features = [event.features for event in events]
-    if any(feature is None for feature in features):
-        raise ValueError("Some events are missing features.")
-    elif any(feature.shape != features[0].shape for feature in features):
-        raise ValueError("Features are not the same shape.")
-
-    features = pd.concat(features)
-    features["descriptor"] = [event.__repr__() for event in events]
-    features.set_index("descriptor", inplace=True)
-    return features
-
-
-def get_metadata_as_dataframe(events: list[Event]) -> pd.DataFrame:
-    """
-    Combine the metadata of a list of events into a single DataFrame.
-    TODO: test this function
-    :param events: the events to gather features for.
-    :return: a DataFrame with all of the event metadata.
-    """
-
-    metadatas = [event.metadata for event in events]
-    if any(metadata is None for metadata in metadatas):
-        raise ValueError("Some events are missing metadata.")
-    elif any(metadata.shape != metadata[0].shape for metadata in metadatas):
-        raise ValueError("Metadata are not the same shape.")
-
-    metadatas = pd.concat(metadatas)
-    metadatas["descriptor"] = [event.__repr__() for event in events]
-    metadatas.set_index("descriptor", inplace=True)
-    return metadatas
-
-
-def save_to_hdf5(events: list[Event], output_path: str) -> bool:
-    """
-    Save the events to an HDF5 file, including metadata and features.
-    :param events:
-    :param output_path:
-    :return:
-    """
-    raise NotImplementedError("This function is not yet implemented.")
-
-
-def load_from_hdf5(input_path: str) -> list[Event]:
-    """
-    Load the events from an HDF5 file, including metadata and features.
-    :param input_path:
-    :return:
-    """
-    raise NotImplementedError("This function is not yet implemented.")
-
-
-def save_to_csv(events: list[Event], output_path: str) -> bool:
-    """
-    Save the events to an CSV file, including metadata and features.
-    :param events:
-    :param output_path:
-    :return:
-    """
-    raise NotImplementedError("This function is not yet implemented.")
-
-
-def load_from_csv(input_path: str) -> list[Event]:
-    """
-    Load the events from an CSV file, including metadata and features.
-    :param input_path:
-    :return:
-    """
-    raise NotImplementedError("This function is not yet implemented.")

@@ -138,7 +138,7 @@ class Tile:
                 )
             tiles = []
             for coordinate in coordinates:
-                tiles.append(Tile(scan, coordinate, n_roi))
+                tiles.append(cls(scan, coordinate, n_roi))
         else:
             if coordinates is None:
                 # Populate coordinates with all (x, y) pairs.
@@ -168,7 +168,7 @@ class Tile:
             tiles = [[None] * (x_max - x_min + 1)] * (y_max - y_min + 1)
             for coordinate in coordinates:
                 x, y = coordinate
-                tiles[y][x] = Tile(scan, coordinate, n_roi)
+                tiles[y][x] = cls(scan, coordinate, n_roi)
 
         return tiles
 
@@ -205,7 +205,7 @@ class Tile:
             for col in cols:
                 coordinates.append((col, row))
 
-        return Tile.get_tiles(scan, coordinates, n_roi, as_flat)
+        return cls.get_tiles(scan, coordinates, n_roi, as_flat)
 
     @classmethod
     def get_tiles_by_xy_bounds(
@@ -230,4 +230,4 @@ class Tile:
         for y in range(y_0, y_1):
             for x in range(x_0, x_1):
                 coordinates.append((x, y))
-        return Tile.get_tiles(scan, coordinates, n_roi, as_flat)
+        return cls.get_tiles(scan, coordinates, n_roi, as_flat)

@@ -229,7 +229,7 @@ class Scan(yaml.YAMLObject):
             os.makedirs(output_path, exist_ok=True)
             # Add the standard metadata file name to the path if needed
             output_path = os.path.join(
-                output_path, Scan.METADATA_FILE_NAME[self.Type.AXIOSCAN7]
+                output_path, self.METADATA_FILE_NAME[self.Type.AXIOSCAN7]
             )
 
         # Populate the file
@@ -246,7 +246,7 @@ class Scan(yaml.YAMLObject):
         input_path = os.path.abspath(input_path)
         if os.path.isdir(input_path):
             input_path = os.path.join(
-                input_path, Scan.METADATA_FILE_NAME[Scan.Type.AXIOSCAN7]
+                input_path, cls.METADATA_FILE_NAME[cls.Type.AXIOSCAN7]
             )
         with open(input_path, "r") as file:
             metadata_obj = yaml.load(file, Loader=yaml.Loader)
@@ -287,7 +287,7 @@ class Scan(yaml.YAMLObject):
     def from_dict(cls, scan_dict) -> typing.Self:
         local_timezone = zoneinfo.ZoneInfo("localtime")
         dt = (scan_dict["end_datetime"] - scan_dict["start_datetime"]).total_seconds()
-        result = Scan(
+        result = cls(
             slide_id=scan_dict["slide_id"],
             path=scan_dict["path"],
             start_date=scan_dict["start_datetime"].astimezone(local_timezone),
@@ -305,7 +305,7 @@ class Scan(yaml.YAMLObject):
         )
         for channel_json in scan_dict["channels"]["data"]:
             result.channels.append(
-                Scan.Channel(
+                cls.Channel(
                     name=channel_json["name"],
                     exposure_ms=channel_json["exposure_ms"],
                     intensity=channel_json["intensity"],
@@ -313,7 +313,7 @@ class Scan(yaml.YAMLObject):
             )
         for roi_json in scan_dict["roi"]["data"]:
             result.roi.append(
-                Scan.ROI(
+                cls.ROI(
                     origin_x_um=roi_json["origin_x_um"],
                     origin_y_um=roi_json["origin_y_um"],
                     width_um=roi_json["width_um"],
@@ -340,12 +340,12 @@ class Scan(yaml.YAMLObject):
         rois_shape = aicspylibczi.CziFile(input_path).get_dims_shape()
 
         # Populate metadata
-        scan = Scan()
+        scan = cls()
 
         scan.slide_id = metadata_xml.find(".//Label/Barcodes/Barcode/Content").text
         scan.slide_id = scan.slide_id.strip().upper()
         # Map the raw scanner ID (service ID) to our IDs
-        scan.scanner_id = Scan.SCANNER_IDS[
+        scan.scanner_id = cls.SCANNER_IDS[
             metadata_xml.find(".//Microscope/UserDefinedName").text
         ]
 
@@ -354,17 +354,17 @@ class Scan(yaml.YAMLObject):
         # Strip out sub-second precision
         date = date[: date.find(".")] + date[max(date.rfind("-"), date.rfind("+")) :]
         date_as_datetime = datetime.datetime.strptime(
-            date, Scan.DATETIME_FORMAT[Scan.Type.AXIOSCAN7]
+            date, cls.DATETIME_FORMAT[cls.Type.AXIOSCAN7]
         )
         scan.start_date = date_as_datetime.strftime(
-            Scan.DATETIME_FORMAT[Scan.Type.AXIOSCAN7]
+            cls.DATETIME_FORMAT[cls.Type.AXIOSCAN7]
         )
         scan.scan_time_s = round(
             float(metadata_xml.find(".//Image/AcquisitionDuration").text) / 1000
         )
         date_as_datetime += datetime.timedelta(seconds=scan.scan_time_s)
         scan.end_date = date_as_datetime.strftime(
-            Scan.DATETIME_FORMAT[Scan.Type.AXIOSCAN7]
+            cls.DATETIME_FORMAT[cls.Type.AXIOSCAN7]
         )
 
         scan.tray = int(metadata_xml.find(".//SlotNumberOfLoadedTray").text)
@@ -406,7 +406,7 @@ class Scan(yaml.YAMLObject):
             else:
                 intensity = float(intensity_xml.text[:-2]) * 1e-2
             scan.channels.append(
-                Scan.Channel(
+                cls.Channel(
                     name=channel.attrib["Name"].upper(),
                     exposure_ms=float(channel.find("./ExposureTime").text) * 1e-6,
                     intensity=intensity,
@@ -507,7 +507,7 @@ class Scan(yaml.YAMLObject):
                 )
             # Strip all sub-micron precision, it does not matter
             scan.roi.append(
-                Scan.ROI(
+                cls.ROI(
                     origin_x_um=roi_limits[0],
                     origin_y_um=roi_limits[1],
                     width_um=roi_limits[2] - roi_limits[0],
@@ -534,7 +534,7 @@ class Scan(yaml.YAMLObject):
         input_path = os.path.abspath(input_path)
         if os.path.isdir(input_path):
             input_path = os.path.join(
-                input_path, Scan.METADATA_FILE_NAME[Scan.Type.BZSCANNER]
+                input_path, cls.METADATA_FILE_NAME[cls.Type.BZSCANNER]
             )
 
         # Read in metadata as a dict
@@ -547,7 +547,7 @@ class Scan(yaml.YAMLObject):
                 metadata_dict[key] = value
 
         # Populate metadata
-        scan = Scan()
+        scan = cls()
 
         scan.slide_id = metadata_dict["SLIDEID"]
         scan.slide_id = scan.slide_id.strip().upper()
@@ -557,22 +557,22 @@ class Scan(yaml.YAMLObject):
         # Extract start and finish datetimes
         date = metadata_dict["DATE"]
         date_as_datetime = datetime.datetime.strptime(
-            date, Scan.DATETIME_FORMAT[Scan.Type.BZSCANNER]
+            date, cls.DATETIME_FORMAT[cls.Type.BZSCANNER]
         )
         date_as_datetime = date_as_datetime.astimezone(
             zoneinfo.ZoneInfo("America/Los_Angeles")
         )  # Hardcoded because BZScanners are here
         scan.start_date = date_as_datetime.strftime(
-            Scan.DATETIME_FORMAT[Scan.Type.AXIOSCAN7]
+            cls.DATETIME_FORMAT[cls.Type.AXIOSCAN7]
         )
         scan.scan_time_s = 90 * 60  # estimated 90 minutes per scan
         date_as_datetime += datetime.timedelta(seconds=scan.scan_time_s)
         scan.end_date = date_as_datetime.strftime(
-            Scan.DATETIME_FORMAT[Scan.Type.AXIOSCAN7]
+            cls.DATETIME_FORMAT[cls.Type.AXIOSCAN7]
         )
 
         # Map the raw scanner ID (service ID) to our IDs
-        scan.scanner_id = f'{Scan.Type.BZSCANNER.value}_{metadata_dict["INSTRUMENT"]}'
+        scan.scanner_id = f'{cls.Type.BZSCANNER.value}_{metadata_dict["INSTRUMENT"]}'
         scan.tray = 0  # only one tray in a BZScanner
         scan.slot = int(metadata_dict["SLIDEPOS"]) - 1  # 1-indexed
 
@@ -589,13 +589,13 @@ class Scan(yaml.YAMLObject):
         scan.tile_overlap_proportion = 0
 
         # Extract channels and create Channel objects from them
-        for channel in list(Scan.BZSCANNER_CHANNEL_MAP.keys()):
+        for channel in list(cls.BZSCANNER_CHANNEL_MAP.keys()):
             channel_settings = metadata_dict[channel].split(",")
             if channel_settings[0] == "0":
                 continue
             scan.channels.append(
-                Scan.Channel(
-                    name=Scan.BZSCANNER_CHANNEL_MAP[channel],
+                cls.Channel(
+                    name=cls.BZSCANNER_CHANNEL_MAP[channel],
                     exposure_ms=float(channel_settings[1]),
                     intensity=float(channel_settings[2]),
                 )
@@ -624,7 +624,7 @@ class Scan(yaml.YAMLObject):
         origin_x_um = 2500 + round((20000 - roi_width) / 2)
         origin_y_um = 2500 + round((58000 - roi_height) / 2)
         scan.roi.append(
-            Scan.ROI(
+            cls.ROI(
                 origin_x_um=origin_x_um,
                 origin_y_um=origin_y_um,
                 width_um=roi_width,
@@ -646,18 +646,18 @@ class Scan(yaml.YAMLObject):
         """
         input_path = os.path.abspath(input_path)
         if os.path.isfile(
-            os.path.join(input_path, Scan.METADATA_FILE_NAME[Scan.Type.AXIOSCAN7])
+            os.path.join(input_path, cls.METADATA_FILE_NAME[cls.Type.AXIOSCAN7])
         ):
-            return Scan.load_yaml(input_path)
+            return cls.load_yaml(input_path)
         elif os.path.isfile(
-            os.path.join(input_path, Scan.METADATA_FILE_NAME[Scan.Type.BZSCANNER])
+            os.path.join(input_path, cls.METADATA_FILE_NAME[cls.Type.BZSCANNER])
         ):
-            return Scan.load_txt(input_path)
+            return cls.load_txt(input_path)
         else:
             raise ValueError(
                 f"No scan metadata files "
-                f"({Scan.METADATA_FILE_NAME[Scan.Type.AXIOSCAN7]}, "
-                f"{Scan.METADATA_FILE_NAME[Scan.Type.BZSCANNER]}) found in folder "
+                f"({cls.METADATA_FILE_NAME[cls.Type.AXIOSCAN7]}, "
+                f"{cls.METADATA_FILE_NAME[cls.Type.BZSCANNER]}) found in folder "
                 f"{input_path}"
             )
         pass
@@ -671,8 +671,8 @@ class Scan(yaml.YAMLObject):
         :param slide_id: the slide ID
         :return: a Scan object
         """
-        scan = Scan()
+        scan = cls()
         scan.slide_id = slide_id
-        scan.roi = [Scan.ROI() for _ in range(n_roi)]
+        scan.roi = [cls.ROI() for _ in range(n_roi)]
         scan.roi[0].tile_cols = n_tile
         return scan

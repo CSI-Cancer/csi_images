@@ -7,13 +7,21 @@ authors = [
     { name = "Brian J. Zhang", email = "8885230+brianjzhang@users.noreply.github.com" }
 ]
 readme = "README.md"
-
 dependencies = [
     "PyYAML >=6.0",
     "aicspylibczi >=3.2",
     "opencv-python-headless >=4.5",
     "pandas >=2.0",
 ]
+classifiers = [
+    "Programming Language :: Python :: 3",
+    "License :: OSI Approved :: MIT License",
+    "Operating System :: OS Independent",
+]
+
+[project.urls]
+Homepage = "https://github.com/CSI-Cancer/csi_images"
+Issues = "https://github.com/CSI-Cancer/csi_images/issues"
 
 [project.scripts]
 make_docs = "csi_images.make_docs:main"

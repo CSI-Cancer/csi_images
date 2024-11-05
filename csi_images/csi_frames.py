@@ -133,13 +133,13 @@ class Frame:
             frames = []
             for n in range(scan.roi[n_roi].tile_rows * scan.roi[n_roi].tile_cols):
                 tile = csi_tiles.Tile(scan, n, n_roi)
-                frames.append(Frame.get_frames(tile, channels))
+                frames.append(cls.get_frames(tile, channels))
         else:
             frames = [[None] * scan.roi[n_roi].tile_cols] * scan.roi[n_roi].tile_rows
             for x in range(scan.roi[n_roi].tile_cols):
                 for y in range(scan.roi[n_roi].tile_rows):
                     tile = csi_tiles.Tile(scan, (x, y), n_roi)
-                    frames[y][x] = Frame.get_frames(tile, channels)
+                    frames[y][x] = cls.get_frames(tile, channels)
         return frames
 
 
