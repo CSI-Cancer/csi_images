@@ -1,8 +1,9 @@
 -e .
-psycopg[binary]
 PyYAML
 aicspylibczi
-opencv-python-headless
+opencv-python
+tifffile
+imagecodecs
 pandas
 pdoc
 pytest

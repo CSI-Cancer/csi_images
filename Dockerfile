@@ -14,7 +14,7 @@ ARG PACKAGE_NAME=csi_images
 
 WORKDIR /$PACKAGE_NAME
 
-# To avoid odd requests during apt install
+# To avoid odd requests during apt install; also used for headless Python logic
 ENV DEBIAN_FRONTEND=noninteractive
 
 # Prepare venv

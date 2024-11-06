@@ -4,14 +4,16 @@ version = "1.1.0"
 description = "CSI-Cancer image data structure and basic processing."
 requires-python = ">=3.11"
 authors = [
-    { name = "Brian J. Zhang", email = "8885230+brianjzhang@users.noreply.github.com" }
+    { name = "Brian Zhang", email = "8885230+brianjzhang@users.noreply.github.com" }
 ]
 readme = "README.md"
 dependencies = [
-    "PyYAML >=6.0",
-    "aicspylibczi >=3.2",
-    "opencv-python-headless >=4.5",
-    "pandas >=2.0",
+    "PyYAML >= 6.0",
+    "aicspylibczi >= 3.2",
+    "tifffile >= 2024.0",
+    "imagecodecs >= 2024.0",
+    "pandas >= 2.0",
+    "tables >= 3.7",
 ]
 classifiers = [
     "Programming Language :: Python :: 3",

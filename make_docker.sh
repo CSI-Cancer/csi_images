@@ -27,4 +27,8 @@ docker run \
   -v /mnt/csidata:/mnt/csidata \
   --entrypoint="" \
   "$PACKAGE_NAME":latest \
-  /bin/bash -c "pip install -r requirements.txt && pytest"
+  /bin/bash -c \
+  "pip install -r requirements.txt &&
+  pip uninstall -y opencv-python &&
+  pip install opencv-python-headless &&
+  pytest"

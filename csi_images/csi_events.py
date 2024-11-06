@@ -11,11 +11,9 @@ csi_utils.csi_scans documentation page for more information on the coordinate sy
 import math
 import os.path
 import typing
-from operator import index
 
 import numpy as np
 import pandas as pd
-import cv2
 
 from csi_images import csi_frames, csi_tiles, csi_scans
 
@@ -478,8 +476,8 @@ class EventArray:
     def save_hdf5(self, output_path: str) -> bool:
         """
         Save the events to an HDF5 file, including metadata and features.
-        For speed, size, and compatibility with R, we convert all data to numpy arrays
-        and index/colnames to attributes.
+        Uses the pandas-provided HDF5 functions for ease, and external compatibility,
+        though these files are slightly harder to view in HDFView or similar.
         :param output_path:
         :return:
         """

@@ -21,7 +21,7 @@ class Scan(yaml.YAMLObject):
     Class that composes a whole scan's metadata. Contains some universal data,
     plus lists for channels and ROIs.
 
-    .. include:: ../docs/csi_utils/coordinate_systems.md
+    .. include:: ../docs/csi_images/coordinate_systems.md
     """
 
     yaml_tag = "csi_utils.scans.Scan"

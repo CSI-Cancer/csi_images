@@ -8,7 +8,7 @@ composite images from a tile and a set of channels.
 import os
 import typing
 
-import cv2
+import tifffile
 import numpy as np
 
 from csi_images import csi_scans, csi_tiles
@@ -87,7 +87,7 @@ class Frame:
             else:
                 raise FileNotFoundError(f"Could not find file {input_path}")
 
-        image = cv2.imread(input_path, cv2.IMREAD_UNCHANGED)
+        image = tifffile.imread(input_path)
         if image is None or image.size == 0:
             raise ValueError(f"Could not load image from {input_path}")
         return image, input_path

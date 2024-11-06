@@ -79,7 +79,7 @@ Must live in the package_name module so that the alias can be installed.</p>
 </span><span id="L-12"><a href="#L-12"><span class="linenos">12</span></a><span class="kn">import</span> <span class="nn">subprocess</span>
 </span><span id="L-13"><a href="#L-13"><span class="linenos">13</span></a>
 </span><span id="L-14"><a href="#L-14"><span class="linenos">14</span></a><span class="n">script</span> <span class="o">=</span> <span class="s2">&quot;&quot;&quot;</span>
-</span><span id="L-15"><a href="#L-15"><span class="linenos">15</span></a><span class="s2">source &quot;</span><span class="si">%s</span><span class="s2">/bin/activate&quot;&amp;&amp;</span>
+</span><span id="L-15"><a href="#L-15"><span class="linenos">15</span></a><span class="s2">source &quot;</span><span class="si">%s</span><span class="s2">/bin/activate&quot; &amp;&amp;</span>
 </span><span id="L-16"><a href="#L-16"><span class="linenos">16</span></a><span class="s2">pip install pdoc -q &amp;&amp;</span>
 </span><span id="L-17"><a href="#L-17"><span class="linenos">17</span></a><span class="s2">pdoc -t docs/theme -o docs csi_images examples tests &amp;&amp;</span>
 </span><span id="L-18"><a href="#L-18"><span class="linenos">18</span></a><span class="s2">echo &quot;Successfully generated documentation at $(pwd)/docs.&quot;</span>
@@ -123,7 +123,7 @@ Must live in the package_name module so that the alias can be installed.</p>
                     <div class="attr variable">
             <span class="name">script</span>        =
 <input id="script-view-value" class="view-value-toggle-state" type="checkbox" aria-hidden="true" tabindex="-1">
-            <label class="view-value-button pdoc-button" for="script-view-value"></label><span class="default_value">&#39;\nsource &#34;%s/bin/activate&#34;&amp;&amp;\npip install pdoc -q &amp;&amp;\npdoc -t docs/theme -o docs csi_images examples tests &amp;&amp;\necho &#34;Successfully generated documentation at $(pwd)/docs.&#34;\n&#39;</span>
+            <label class="view-value-button pdoc-button" for="script-view-value"></label><span class="default_value">&#39;\nsource &#34;%s/bin/activate&#34; &amp;&amp;\npip install pdoc -q &amp;&amp;\npdoc -t docs/theme -o docs csi_images examples tests &amp;&amp;\necho &#34;Successfully generated documentation at $(pwd)/docs.&#34;\n&#39;</span>
 
         
     </div>

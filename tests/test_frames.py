@@ -1,8 +1,14 @@
+import os
+
 import cv2
 
 from csi_images import csi_frames, csi_tiles, csi_scans
 
-SHOW_PLOTS = False
+if os.environ.get("DEBIAN_FRONTEND") == "noninteractive":
+    SHOW_PLOTS = False
+else:
+    # Change this to your preference for local testing, but commit as True
+    SHOW_PLOTS = True
 
 
 def test_getting_frames():
