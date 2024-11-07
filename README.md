@@ -21,8 +21,7 @@ This package contains these helpful modules:
         * `get_tiles_by_xy_bounds()`: gets the tiles within particular x and y bounds.
 5. `csi_frames.py`: a module for interacting with frames, which are individual images
    from the scan. Each frame in a tile has a different channel, or light spectrum.
-   Imports `csi_scans.py` and `csi_tiles.py`. For more information on this organization,
-   see the [CSI IT documentation](https://uscedu.sharepoint.com/sites/CSIITSoftware).
+   Imports `csi_scans.py` and `csi_tiles.py`. 
     * `Frame`: a class for containing a frame's metadata.
         * `get_image()`: gets the image of the frame.
         * `get_frames()`: gets the frames of a tile.
@@ -60,13 +59,17 @@ This package contains these helpful modules:
 
 ## Documentation
 
-For more detailed documentation, open up `docs/index.html` in your browser.
+For more detailed documentation, check 
+[the API docs](https://csi-cancer.github.io/csi_images/).
+
+Alternatively, once you have cloned the repository, you 
+can open up `docs/index.html` in your browser.
 
 To regenerate the documentation, ensure that you
 have [installed the package](#installation) and then run:
 
 ```commandline
-make_docs
+make_docs_csi_images
 ```
 
 ## Installation
