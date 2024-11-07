@@ -36,7 +36,7 @@ def load_in_images():
 
     # And for each frame, we can load the actual image
     # First element is the image array, second element is the file path it came from
-    image = frames[0].get_image()[0]
+    image = frames[0].get_image()
     assert image.shape == (scan.tile_height_px, scan.tile_width_px)
 
 

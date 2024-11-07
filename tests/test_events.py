@@ -1,6 +1,8 @@
 import os
+import time
 
 import cv2
+import numpy as np
 import pandas as pd
 
 from csi_images import csi_events, csi_tiles, csi_scans
@@ -26,8 +28,8 @@ def test_getting_event():
     assert len(images) == 4
     images = event.extract_images(crop_size=100, in_pixels=True)
     assert images[0].shape == (100, 100)
-    images = event.extract_images(crop_size=301, in_pixels=True)
-    assert images[0].shape == (301, 301)
+    images = event.extract_images(crop_size=50, in_pixels=True)
+    assert images[0].shape == (50, 50)
 
     if SHOW_PLOTS:
         for image in images:
@@ -46,14 +48,55 @@ def test_getting_event():
     assert len(images) == 4
     images = event.extract_images(crop_size=100, in_pixels=True)
     assert images[0].shape == (100, 100)
-    images = event.extract_images(crop_size=301, in_pixels=True)
-    assert images[0].shape == (301, 301)
+    images = event.extract_images(crop_size=200, in_pixels=True)
+    assert images[0].shape == (200, 200)
 
     if SHOW_PLOTS:
         for image in images:
             cv2.imshow("Events in the corner of a tile", image)
             cv2.waitKey(0)
         cv2.destroyAllWindows()
+
+
+def test_getting_many_events():
+    scan = csi_scans.Scan.load_txt("tests/data")
+    tile = csi_tiles.Tile(scan, 1000)
+    tile2 = csi_tiles.Tile(scan, 0)
+    events = [
+        csi_events.Event(scan, tile, 515, 411),
+        csi_events.Event(scan, tile2, 2, 1000),
+        csi_events.Event(scan, tile, 1000, 1000),
+        csi_events.Event(scan, tile, 87, 126),
+        csi_events.Event(scan, tile, 1000, 2),
+        csi_events.Event(scan, tile2, 800, 800),
+        csi_events.Event(scan, tile, 1000, 662),
+    ]
+    # Test time to extract images sequentially
+    start_time = time.time()
+    images_1 = []
+    for event in events:
+        images_1.append(event.extract_images())
+    sequential_time = time.time() - start_time
+
+    # Test time to extract images in parallel
+    start_time = time.time()
+    images_2 = csi_events.Event.extract_images_for_list(events, crop_size=50)
+    parallel_time = time.time() - start_time
+    assert parallel_time < sequential_time
+    for list_a, list_b in zip(images_1, images_2):
+        assert len(list_a) == len(list_b)
+        for image_a, image_b in zip(list_a, list_b):
+            assert np.array_equal(image_a, image_b)
+
+    # Test that it works after converting to EventArray and back
+    event_array = csi_events.EventArray.from_events(events)
+    remade_events = event_array.to_events(
+        [scan], ignore_metadata=True, ignore_features=True
+    )
+    images_3 = csi_events.Event.extract_images_for_list(
+        remade_events,
+        crop_size=50,
+    )
 
 
 def test_event_coordinates_for_bzscanner():
@@ -156,6 +199,7 @@ def test_eventarray_conversions():
 
     assert event_array == csi_events.EventArray.from_dataframe(events_df)
 
+    # Test saving and loading
     assert event_array.save_csv("tests/data/events.csv")
     assert event_array == csi_events.EventArray.load_csv("tests/data/events.csv")
     os.remove("tests/data/events.csv")

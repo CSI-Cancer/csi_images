@@ -669,8 +669,16 @@ class Scan(yaml.YAMLObject):
         """
         Make a placeholder Scan object with only basic required information filled in.
         :param slide_id: the slide ID
+        :param n_tile: the number of this tile, which will become the number of
+                       tiles in the scan
+        :param n_roi: the number of ROIs in the scan
         :return: a Scan object
         """
+        # Sanitize inputs here
+        slide_id = str(slide_id).strip().upper()
+        n_tile = int(n_tile)
+        n_roi = int(n_roi)
+        # Generate the object
         scan = cls()
         scan.slide_id = slide_id
         scan.roi = [cls.ROI() for _ in range(n_roi)]

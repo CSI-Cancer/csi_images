@@ -25,19 +25,24 @@ def test_getting_frames():
     assert len(frames[0][0]) == 4
 
 
-def test_making_composite_frames():
+def test_make_rgb():
     scan = csi_scans.Scan.load_txt("tests/data")
     tile = csi_tiles.Tile(scan, 1000)
     frames = csi_frames.Frame.get_frames(tile)
 
     if SHOW_PLOTS:
         for frame in frames:
-            cv2.imshow("Frames from a tile", frame.get_image()[0])
+            cv2.imshow("Frames from a tile", frame.get_image())
             cv2.waitKey(0)
         cv2.destroyAllWindows()
 
     channel_indices = scan.get_channel_indices(["TRITC", "CY5", "DAPI"])
-    image = csi_frames.make_rgb_image(tile, channel_indices)
+    channels = {
+        channel_indices[0]: (1.0, 0.0, 0.0),
+        channel_indices[1]: (0.0, 1.0, 0.0),
+        channel_indices[2]: (0.0, 0.0, 1.0),
+    }
+    image = csi_frames.Frame.make_rgb_image(tile, channels)
     assert image.shape == (scan.tile_height_px, scan.tile_width_px, 3)
 
     if SHOW_PLOTS:
@@ -47,7 +52,13 @@ def test_making_composite_frames():
 
     # Test with a white channel
     channel_indices = scan.get_channel_indices(["TRITC", "CY5", "DAPI", "AF488"])
-    image = csi_frames.make_rgbw_image(tile, channel_indices)
+    channels = {
+        channel_indices[0]: (1.0, 0.0, 0.0),
+        channel_indices[1]: (0.0, 1.0, 0.0),
+        channel_indices[2]: (0.0, 0.0, 1.0),
+        channel_indices[3]: (1.0, 1.0, 1.0),
+    }
+    image = csi_frames.Frame.make_rgb_image(tile, channels)
     assert image.shape == (scan.tile_height_px, scan.tile_width_px, 3)
 
     if SHOW_PLOTS:

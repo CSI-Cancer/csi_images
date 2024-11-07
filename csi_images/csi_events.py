@@ -15,7 +15,9 @@ import typing
 import numpy as np
 import pandas as pd
 
-from csi_images import csi_frames, csi_tiles, csi_scans
+from csi_images.csi_scans import Scan
+from csi_images.csi_tiles import Tile
+from csi_images.csi_frames import Frame
 
 
 class Event:
@@ -28,7 +30,7 @@ class Event:
     # 2D homogenous transformation matrices
     # Translations (final column) are in micrometers (um)
     SCAN_TO_SLIDE_TRANSFORM = {
-        csi_scans.Scan.Type.AXIOSCAN7: np.array(
+        Scan.Type.AXIOSCAN7: np.array(
             [
                 [1, 0, 75000],
                 [0, 1, 0],
@@ -39,7 +41,7 @@ class Event:
         # - The slide is upside-down.
         # - The slide is oriented vertically, with the barcode at the bottom.
         # - Tiles are numbered from the top-right
-        csi_scans.Scan.Type.BZSCANNER: np.array(
+        Scan.Type.BZSCANNER: np.array(
             [
                 [0, -1, 75000],
                 [-1, 0, 25000],
@@ -59,11 +61,11 @@ class Event:
 
     def __init__(
         self,
-        scan: csi_scans.Scan,
-        tile: csi_tiles.Tile,
+        scan: Scan,
+        tile: Tile,
         x: int,
         y: int,
-        size: int = 10,  # End-to-end size in pixels
+        size: int = 12,  # End-to-end size in pixels
         metadata: pd.Series = None,
         features: pd.Series = None,
     ):
@@ -80,6 +82,9 @@ class Event:
 
     def __eq__(self, other) -> bool:
         return self.__repr__() == other.__repr__()
+
+    def __lt__(self, other):
+        return self.__repr__() < other.__repr__()
 
     def get_scan_position(self) -> tuple[float, float]:
         """
@@ -116,24 +121,8 @@ class Event:
         slide_position = np.matmul(transform, scan_position)
         return float(slide_position[0][0]), float(slide_position[1][0])
 
-    def extract_images(
-        self, crop_size: int = 10, in_pixels: bool = False
-    ) -> list[np.ndarray]:
-        """
-        Extract the images from the scan and tile, reading from the file. Called
-        "extract" because it must read and extract the images from file, which is slow.
-        Use this if you're interested in only a few events, as it is inefficient when
-        reading multiple events from the same tile.
-        :param crop_size: the square size of the image crop to get for this event. Defaults to 10um.
-        :param in_pixels: whether the crop size is in pixels or micrometers. Defaults to um.
-        :return: a list of cropped images from the scan in the order of the channels.
-        """
-        frames = csi_frames.Frame.get_frames(self.tile)
-        images = [frame.get_image()[0] for frame in frames]
-        return self.crop_images(images, crop_size, in_pixels)
-
     def crop_images(
-        self, images: list[np.ndarray], crop_size: int = 10, in_pixels: bool = False
+        self, images: list[np.ndarray], crop_size: int = 50, in_pixels: bool = True
     ) -> list[np.ndarray]:
         """
         Get the event crops from the frame images. Called "get" because it does not
@@ -141,8 +130,8 @@ class Event:
         the same tile.
         Use this if you're interested in many events.
         :param images: the frame images.
-        :param crop_size: the square size of the image crop to get for this event. Defaults to 10um.
-        :param in_pixels: whether the crop size is in pixels or micrometers. Defaults to um.
+        :param crop_size: the square size of the image crop to get for this event.
+        :param in_pixels: whether the crop size is in pixels or micrometers. Defaults to pixels.
         :return: image_size x image_size crops of the event in the provided frames. If
         the event is too close to the edge, the crop will be smaller and not centered.
         """
@@ -171,17 +160,85 @@ class Event:
             min(images[0].shape[0], bounds[3]),
         ]
 
-        for i in range(len(images)):
+        # Crop the images
+        cropped_images = []
+        for image in images:
             # Create a blank image of the right size
-            cropped_image = np.zeros((crop_size, crop_size), dtype=np.uint16)
+            cropped_image = np.zeros((crop_size, crop_size), dtype=image.dtype)
 
             # Insert the cropped image into the blank image, leaving a black buffer
             # around the edges if the crop would go beyond the original image bounds
             cropped_image[
                 displacements[1] : crop_size - displacements[3],
                 displacements[0] : crop_size - displacements[2],
-            ] = images[i][bounds[1] : bounds[3], bounds[0] : bounds[2]]
-            images[i] = cropped_image
+            ] = image[bounds[1] : bounds[3], bounds[0] : bounds[2]]
+            cropped_images.append(cropped_image)
+        return cropped_images
+
+    def extract_images(
+        self, crop_size: int = 50, in_pixels: bool = True
+    ) -> list[np.ndarray]:
+        """
+        Extract the images from the scan and tile, reading from the file. Called
+        "extract" because it must read and extract the images from file, which is slow.
+        Use this if you're interested in only a few events, as it is inefficient when
+        reading multiple events from the same tile.
+        :param crop_size: the square size of the image crop to get for this event.
+        :param in_pixels: whether the crop size is in pixels or micrometers. Defaults to pixels.
+        :return: a list of cropped images from the scan in the order of the channels.
+        """
+        frames = Frame.get_frames(self.tile)
+        images = [frame.get_image() for frame in frames]
+        return self.crop_images(images, crop_size, in_pixels)
+
+    @classmethod
+    def extract_images_for_list(
+        cls,
+        events: list[typing.Self],
+        crop_size: int | list[int] = None,
+        in_pixels: bool = True,
+    ) -> list[list[np.ndarray]]:
+        """
+        Get the images for a list of events, ensuring that there is no wasteful reading
+        of the same tile multiple times. This function is more efficient than calling
+        extract_event_images for each event.
+        TODO: test this function
+        :param events: the events to extract images for.
+        :param crop_size: the square size of the image crop to get for this event.
+                          Defaults to twice the size of the event.
+        :param in_pixels: whether the crop size is in pixels or micrometers.
+                          Defaults to pixels, and is ignored if crop_size is None.
+        :return: a list of lists of cropped images for each event.
+        """
+        if len(events) == 0:
+            return []
+
+        # Populate a crop size if none provided
+        if crop_size is None:
+            crop_size = [4 * event.size for event in events]
+            in_pixels = True
+        # Propagate a constant crop size
+        elif isinstance(crop_size, int):
+            crop_size = [crop_size] * len(events)
+
+        # Sort the events by tile; use a shallow copy to avoid modifying the original
+        order, _ = zip(*sorted(enumerate(events), key=lambda x: x[1].__repr__()))
+
+        # Allocate the list to size
+        images = [None] * len(events)
+        last_tile = None
+        frame_images = None  # Holds large numpy arrays, so expensive to compare
+        # Iterate through in sorted order
+        for i in order:
+            if last_tile != events[i].tile:
+                # Gather the frame images, preserving them for the next event
+                frames = Frame.get_frames(events[i].tile)
+                frame_images = [frame.get_image() for frame in frames]
+
+                last_tile = events[i].tile
+            # Use the frame images to crop the event images
+            # Preserve the original order using order[i]
+            images[i] = events[i].crop_images(frame_images, crop_size[i], in_pixels)
         return images
 
 
@@ -370,12 +427,19 @@ class EventArray:
         return EventArray(info=info, metadata=metadata, features=features)
 
     def to_events(
-        self, scans: list[csi_scans.Scan], ignore_missing_scans=True
+        self,
+        scans: list[Scan],
+        ignore_missing_scans=True,
+        ignore_metadata=False,
+        ignore_features=False,
     ) -> list[Event]:
         """
         Get the events in the EventArray as a list of events.
-        :param scans: the scans that the events belong to.
+        :param scans: the scans that the events belong to. Pass an empty list if you
+                      don't care about scan metadata.
         :param ignore_missing_scans: whether to create blank scans for events without scans.
+        :param ignore_metadata: whether to ignore metadata or not
+        :param ignore_features: whether to ignore features or not
         :return:
         """
         events = []
@@ -389,7 +453,7 @@ class EventArray:
             if scan is None:
                 if ignore_missing_scans:
                     # Create a placeholder scan if the scan is missing
-                    scan = csi_scans.Scan.make_placeholder(
+                    scan = Scan.make_placeholder(
                         self.info["slide_id"][i],
                         self.info["tile"][i],
                         self.info["roi"][i],
@@ -402,12 +466,12 @@ class EventArray:
             events.append(
                 Event(
                     scan,
-                    csi_tiles.Tile(scan, self.info["tile"][i], self.info["roi"][i]),
+                    Tile(scan, self.info["tile"][i], self.info["roi"][i]),
                     self.info["x"][i],
                     self.info["y"][i],
                     size=self.info["size"][i],
-                    metadata=self.metadata.loc[i],
-                    features=self.features.loc[i],
+                    metadata=None if ignore_metadata else self.metadata.loc[i],
+                    features=None if ignore_features else self.features.loc[i],
                 )
             )
         return events
@@ -506,47 +570,3 @@ class EventArray:
             metadata = store.get("metadata") if "metadata" in store else None
             features = store.get("features") if "features" in store else None
         return cls(info=info, metadata=metadata, features=features)
-
-
-def extract_all_event_images(
-    events: list[Event],
-    crop_size: list[int] = None,
-    in_pixels: bool = False,
-) -> list[list[np.ndarray]]:
-    """
-    Get the images for a list of events, ensuring that there is no wasteful reading
-    of the same tile multiple times. This function is more efficient than calling
-    extract_event_images for each event.
-    TODO: test this function
-    :param events: the events to extract images for.
-    :param crop_size: the square size of the image crop to get for this event.
-                      Defaults to twice the size of the event.
-    :param in_pixels: whether the crop size is in pixels or micrometers.
-                      Defaults to um.
-    :return: a list of lists of cropped images for each event.
-    """
-
-    # Sort the events by tile; use a shallow copy to avoid modifying the original
-    events, order = zip(*sorted(enumerate(events), key=lambda x: x[1].tile.__repr__()))
-
-    if crop_size is None:
-        crop_size = [2 * event.size for event in events]
-        in_pixels = True
-
-    # Allocate the list to size
-    images = [None] * len(events)
-    last_tile = None
-    frame_images = None  # Holds large numpy arrays, so expensive to compare
-    for i in range(len(events)):
-        if last_tile != events[i].tile:
-            # Gather the frame images, preserving them for the next event
-            frames = csi_frames.Frame.get_frames(events[i].tile)
-            frame_images = [frame.get_image()[0] for frame in frames]
-
-            last_tile = events[i].tile
-        # Use the frame images to crop the event images
-        # Preserve the original order using order[i]
-        images[order[i]] = events[i].crop_images_to_event(
-            frame_images, crop_size[i], in_pixels
-        )
-    return images

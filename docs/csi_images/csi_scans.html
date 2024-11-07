@@ -900,13 +900,21 @@ object can also be loaded from a .czi file or a .txt file.</p>
 </span><span id="L-669"><a href="#L-669"><span class="linenos">669</span></a><span class="w">        </span><span class="sd">&quot;&quot;&quot;</span>
 </span><span id="L-670"><a href="#L-670"><span class="linenos">670</span></a><span class="sd">        Make a placeholder Scan object with only basic required information filled in.</span>
 </span><span id="L-671"><a href="#L-671"><span class="linenos">671</span></a><span class="sd">        :param slide_id: the slide ID</span>
-</span><span id="L-672"><a href="#L-672"><span class="linenos">672</span></a><span class="sd">        :return: a Scan object</span>
-</span><span id="L-673"><a href="#L-673"><span class="linenos">673</span></a><span class="sd">        &quot;&quot;&quot;</span>
-</span><span id="L-674"><a href="#L-674"><span class="linenos">674</span></a>        <span class="n">scan</span> <span class="o">=</span> <span class="bp">cls</span><span class="p">()</span>
-</span><span id="L-675"><a href="#L-675"><span class="linenos">675</span></a>        <span class="n">scan</span><span class="o">.</span><span class="n">slide_id</span> <span class="o">=</span> <span class="n">slide_id</span>
-</span><span id="L-676"><a href="#L-676"><span class="linenos">676</span></a>        <span class="n">scan</span><span class="o">.</span><span class="n">roi</span> <span class="o">=</span> <span class="p">[</span><span class="bp">cls</span><span class="o">.</span><span class="n">ROI</span><span class="p">()</span> <span class="k">for</span> <span class="n">_</span> <span class="ow">in</span> <span class="nb">range</span><span class="p">(</span><span class="n">n_roi</span><span class="p">)]</span>
-</span><span id="L-677"><a href="#L-677"><span class="linenos">677</span></a>        <span class="n">scan</span><span class="o">.</span><span class="n">roi</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span><span class="o">.</span><span class="n">tile_cols</span> <span class="o">=</span> <span class="n">n_tile</span>
-</span><span id="L-678"><a href="#L-678"><span class="linenos">678</span></a>        <span class="k">return</span> <span class="n">scan</span>
+</span><span id="L-672"><a href="#L-672"><span class="linenos">672</span></a><span class="sd">        :param n_tile: the number of this tile, which will become the number of</span>
+</span><span id="L-673"><a href="#L-673"><span class="linenos">673</span></a><span class="sd">                       tiles in the scan</span>
+</span><span id="L-674"><a href="#L-674"><span class="linenos">674</span></a><span class="sd">        :param n_roi: the number of ROIs in the scan</span>
+</span><span id="L-675"><a href="#L-675"><span class="linenos">675</span></a><span class="sd">        :return: a Scan object</span>
+</span><span id="L-676"><a href="#L-676"><span class="linenos">676</span></a><span class="sd">        &quot;&quot;&quot;</span>
+</span><span id="L-677"><a href="#L-677"><span class="linenos">677</span></a>        <span class="c1"># Sanitize inputs here</span>
+</span><span id="L-678"><a href="#L-678"><span class="linenos">678</span></a>        <span class="n">slide_id</span> <span class="o">=</span> <span class="nb">str</span><span class="p">(</span><span class="n">slide_id</span><span class="p">)</span><span class="o">.</span><span class="n">strip</span><span class="p">()</span><span class="o">.</span><span class="n">upper</span><span class="p">()</span>
+</span><span id="L-679"><a href="#L-679"><span class="linenos">679</span></a>        <span class="n">n_tile</span> <span class="o">=</span> <span class="nb">int</span><span class="p">(</span><span class="n">n_tile</span><span class="p">)</span>
+</span><span id="L-680"><a href="#L-680"><span class="linenos">680</span></a>        <span class="n">n_roi</span> <span class="o">=</span> <span class="nb">int</span><span class="p">(</span><span class="n">n_roi</span><span class="p">)</span>
+</span><span id="L-681"><a href="#L-681"><span class="linenos">681</span></a>        <span class="c1"># Generate the object</span>
+</span><span id="L-682"><a href="#L-682"><span class="linenos">682</span></a>        <span class="n">scan</span> <span class="o">=</span> <span class="bp">cls</span><span class="p">()</span>
+</span><span id="L-683"><a href="#L-683"><span class="linenos">683</span></a>        <span class="n">scan</span><span class="o">.</span><span class="n">slide_id</span> <span class="o">=</span> <span class="n">slide_id</span>
+</span><span id="L-684"><a href="#L-684"><span class="linenos">684</span></a>        <span class="n">scan</span><span class="o">.</span><span class="n">roi</span> <span class="o">=</span> <span class="p">[</span><span class="bp">cls</span><span class="o">.</span><span class="n">ROI</span><span class="p">()</span> <span class="k">for</span> <span class="n">_</span> <span class="ow">in</span> <span class="nb">range</span><span class="p">(</span><span class="n">n_roi</span><span class="p">)]</span>
+</span><span id="L-685"><a href="#L-685"><span class="linenos">685</span></a>        <span class="n">scan</span><span class="o">.</span><span class="n">roi</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span><span class="o">.</span><span class="n">tile_cols</span> <span class="o">=</span> <span class="n">n_tile</span>
+</span><span id="L-686"><a href="#L-686"><span class="linenos">686</span></a>        <span class="k">return</span> <span class="n">scan</span>
 </span></pre></div>
 
 
@@ -1575,13 +1583,21 @@ object can also be loaded from a .czi file or a .txt file.</p>
 </span><span id="Scan-670"><a href="#Scan-670"><span class="linenos">670</span></a><span class="w">        </span><span class="sd">&quot;&quot;&quot;</span>
 </span><span id="Scan-671"><a href="#Scan-671"><span class="linenos">671</span></a><span class="sd">        Make a placeholder Scan object with only basic required information filled in.</span>
 </span><span id="Scan-672"><a href="#Scan-672"><span class="linenos">672</span></a><span class="sd">        :param slide_id: the slide ID</span>
-</span><span id="Scan-673"><a href="#Scan-673"><span class="linenos">673</span></a><span class="sd">        :return: a Scan object</span>
-</span><span id="Scan-674"><a href="#Scan-674"><span class="linenos">674</span></a><span class="sd">        &quot;&quot;&quot;</span>
-</span><span id="Scan-675"><a href="#Scan-675"><span class="linenos">675</span></a>        <span class="n">scan</span> <span class="o">=</span> <span class="bp">cls</span><span class="p">()</span>
-</span><span id="Scan-676"><a href="#Scan-676"><span class="linenos">676</span></a>        <span class="n">scan</span><span class="o">.</span><span class="n">slide_id</span> <span class="o">=</span> <span class="n">slide_id</span>
-</span><span id="Scan-677"><a href="#Scan-677"><span class="linenos">677</span></a>        <span class="n">scan</span><span class="o">.</span><span class="n">roi</span> <span class="o">=</span> <span class="p">[</span><span class="bp">cls</span><span class="o">.</span><span class="n">ROI</span><span class="p">()</span> <span class="k">for</span> <span class="n">_</span> <span class="ow">in</span> <span class="nb">range</span><span class="p">(</span><span class="n">n_roi</span><span class="p">)]</span>
-</span><span id="Scan-678"><a href="#Scan-678"><span class="linenos">678</span></a>        <span class="n">scan</span><span class="o">.</span><span class="n">roi</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span><span class="o">.</span><span class="n">tile_cols</span> <span class="o">=</span> <span class="n">n_tile</span>
-</span><span id="Scan-679"><a href="#Scan-679"><span class="linenos">679</span></a>        <span class="k">return</span> <span class="n">scan</span>
+</span><span id="Scan-673"><a href="#Scan-673"><span class="linenos">673</span></a><span class="sd">        :param n_tile: the number of this tile, which will become the number of</span>
+</span><span id="Scan-674"><a href="#Scan-674"><span class="linenos">674</span></a><span class="sd">                       tiles in the scan</span>
+</span><span id="Scan-675"><a href="#Scan-675"><span class="linenos">675</span></a><span class="sd">        :param n_roi: the number of ROIs in the scan</span>
+</span><span id="Scan-676"><a href="#Scan-676"><span class="linenos">676</span></a><span class="sd">        :return: a Scan object</span>
+</span><span id="Scan-677"><a href="#Scan-677"><span class="linenos">677</span></a><span class="sd">        &quot;&quot;&quot;</span>
+</span><span id="Scan-678"><a href="#Scan-678"><span class="linenos">678</span></a>        <span class="c1"># Sanitize inputs here</span>
+</span><span id="Scan-679"><a href="#Scan-679"><span class="linenos">679</span></a>        <span class="n">slide_id</span> <span class="o">=</span> <span class="nb">str</span><span class="p">(</span><span class="n">slide_id</span><span class="p">)</span><span class="o">.</span><span class="n">strip</span><span class="p">()</span><span class="o">.</span><span class="n">upper</span><span class="p">()</span>
+</span><span id="Scan-680"><a href="#Scan-680"><span class="linenos">680</span></a>        <span class="n">n_tile</span> <span class="o">=</span> <span class="nb">int</span><span class="p">(</span><span class="n">n_tile</span><span class="p">)</span>
+</span><span id="Scan-681"><a href="#Scan-681"><span class="linenos">681</span></a>        <span class="n">n_roi</span> <span class="o">=</span> <span class="nb">int</span><span class="p">(</span><span class="n">n_roi</span><span class="p">)</span>
+</span><span id="Scan-682"><a href="#Scan-682"><span class="linenos">682</span></a>        <span class="c1"># Generate the object</span>
+</span><span id="Scan-683"><a href="#Scan-683"><span class="linenos">683</span></a>        <span class="n">scan</span> <span class="o">=</span> <span class="bp">cls</span><span class="p">()</span>
+</span><span id="Scan-684"><a href="#Scan-684"><span class="linenos">684</span></a>        <span class="n">scan</span><span class="o">.</span><span class="n">slide_id</span> <span class="o">=</span> <span class="n">slide_id</span>
+</span><span id="Scan-685"><a href="#Scan-685"><span class="linenos">685</span></a>        <span class="n">scan</span><span class="o">.</span><span class="n">roi</span> <span class="o">=</span> <span class="p">[</span><span class="bp">cls</span><span class="o">.</span><span class="n">ROI</span><span class="p">()</span> <span class="k">for</span> <span class="n">_</span> <span class="ow">in</span> <span class="nb">range</span><span class="p">(</span><span class="n">n_roi</span><span class="p">)]</span>
+</span><span id="Scan-686"><a href="#Scan-686"><span class="linenos">686</span></a>        <span class="n">scan</span><span class="o">.</span><span class="n">roi</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span><span class="o">.</span><span class="n">tile_cols</span> <span class="o">=</span> <span class="n">n_tile</span>
+</span><span id="Scan-687"><a href="#Scan-687"><span class="linenos">687</span></a>        <span class="k">return</span> <span class="n">scan</span>
 </span></pre></div>
 
 
@@ -2670,13 +2686,21 @@ Prefers scan.yaml if both exist.</p>
 </span><span id="Scan.make_placeholder-670"><a href="#Scan.make_placeholder-670"><span class="linenos">670</span></a><span class="w">        </span><span class="sd">&quot;&quot;&quot;</span>
 </span><span id="Scan.make_placeholder-671"><a href="#Scan.make_placeholder-671"><span class="linenos">671</span></a><span class="sd">        Make a placeholder Scan object with only basic required information filled in.</span>
 </span><span id="Scan.make_placeholder-672"><a href="#Scan.make_placeholder-672"><span class="linenos">672</span></a><span class="sd">        :param slide_id: the slide ID</span>
-</span><span id="Scan.make_placeholder-673"><a href="#Scan.make_placeholder-673"><span class="linenos">673</span></a><span class="sd">        :return: a Scan object</span>
-</span><span id="Scan.make_placeholder-674"><a href="#Scan.make_placeholder-674"><span class="linenos">674</span></a><span class="sd">        &quot;&quot;&quot;</span>
-</span><span id="Scan.make_placeholder-675"><a href="#Scan.make_placeholder-675"><span class="linenos">675</span></a>        <span class="n">scan</span> <span class="o">=</span> <span class="bp">cls</span><span class="p">()</span>
-</span><span id="Scan.make_placeholder-676"><a href="#Scan.make_placeholder-676"><span class="linenos">676</span></a>        <span class="n">scan</span><span class="o">.</span><span class="n">slide_id</span> <span class="o">=</span> <span class="n">slide_id</span>
-</span><span id="Scan.make_placeholder-677"><a href="#Scan.make_placeholder-677"><span class="linenos">677</span></a>        <span class="n">scan</span><span class="o">.</span><span class="n">roi</span> <span class="o">=</span> <span class="p">[</span><span class="bp">cls</span><span class="o">.</span><span class="n">ROI</span><span class="p">()</span> <span class="k">for</span> <span class="n">_</span> <span class="ow">in</span> <span class="nb">range</span><span class="p">(</span><span class="n">n_roi</span><span class="p">)]</span>
-</span><span id="Scan.make_placeholder-678"><a href="#Scan.make_placeholder-678"><span class="linenos">678</span></a>        <span class="n">scan</span><span class="o">.</span><span class="n">roi</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span><span class="o">.</span><span class="n">tile_cols</span> <span class="o">=</span> <span class="n">n_tile</span>
-</span><span id="Scan.make_placeholder-679"><a href="#Scan.make_placeholder-679"><span class="linenos">679</span></a>        <span class="k">return</span> <span class="n">scan</span>
+</span><span id="Scan.make_placeholder-673"><a href="#Scan.make_placeholder-673"><span class="linenos">673</span></a><span class="sd">        :param n_tile: the number of this tile, which will become the number of</span>
+</span><span id="Scan.make_placeholder-674"><a href="#Scan.make_placeholder-674"><span class="linenos">674</span></a><span class="sd">                       tiles in the scan</span>
+</span><span id="Scan.make_placeholder-675"><a href="#Scan.make_placeholder-675"><span class="linenos">675</span></a><span class="sd">        :param n_roi: the number of ROIs in the scan</span>
+</span><span id="Scan.make_placeholder-676"><a href="#Scan.make_placeholder-676"><span class="linenos">676</span></a><span class="sd">        :return: a Scan object</span>
+</span><span id="Scan.make_placeholder-677"><a href="#Scan.make_placeholder-677"><span class="linenos">677</span></a><span class="sd">        &quot;&quot;&quot;</span>
+</span><span id="Scan.make_placeholder-678"><a href="#Scan.make_placeholder-678"><span class="linenos">678</span></a>        <span class="c1"># Sanitize inputs here</span>
+</span><span id="Scan.make_placeholder-679"><a href="#Scan.make_placeholder-679"><span class="linenos">679</span></a>        <span class="n">slide_id</span> <span class="o">=</span> <span class="nb">str</span><span class="p">(</span><span class="n">slide_id</span><span class="p">)</span><span class="o">.</span><span class="n">strip</span><span class="p">()</span><span class="o">.</span><span class="n">upper</span><span class="p">()</span>
+</span><span id="Scan.make_placeholder-680"><a href="#Scan.make_placeholder-680"><span class="linenos">680</span></a>        <span class="n">n_tile</span> <span class="o">=</span> <span class="nb">int</span><span class="p">(</span><span class="n">n_tile</span><span class="p">)</span>
+</span><span id="Scan.make_placeholder-681"><a href="#Scan.make_placeholder-681"><span class="linenos">681</span></a>        <span class="n">n_roi</span> <span class="o">=</span> <span class="nb">int</span><span class="p">(</span><span class="n">n_roi</span><span class="p">)</span>
+</span><span id="Scan.make_placeholder-682"><a href="#Scan.make_placeholder-682"><span class="linenos">682</span></a>        <span class="c1"># Generate the object</span>
+</span><span id="Scan.make_placeholder-683"><a href="#Scan.make_placeholder-683"><span class="linenos">683</span></a>        <span class="n">scan</span> <span class="o">=</span> <span class="bp">cls</span><span class="p">()</span>
+</span><span id="Scan.make_placeholder-684"><a href="#Scan.make_placeholder-684"><span class="linenos">684</span></a>        <span class="n">scan</span><span class="o">.</span><span class="n">slide_id</span> <span class="o">=</span> <span class="n">slide_id</span>
+</span><span id="Scan.make_placeholder-685"><a href="#Scan.make_placeholder-685"><span class="linenos">685</span></a>        <span class="n">scan</span><span class="o">.</span><span class="n">roi</span> <span class="o">=</span> <span class="p">[</span><span class="bp">cls</span><span class="o">.</span><span class="n">ROI</span><span class="p">()</span> <span class="k">for</span> <span class="n">_</span> <span class="ow">in</span> <span class="nb">range</span><span class="p">(</span><span class="n">n_roi</span><span class="p">)]</span>
+</span><span id="Scan.make_placeholder-686"><a href="#Scan.make_placeholder-686"><span class="linenos">686</span></a>        <span class="n">scan</span><span class="o">.</span><span class="n">roi</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span><span class="o">.</span><span class="n">tile_cols</span> <span class="o">=</span> <span class="n">n_tile</span>
+</span><span id="Scan.make_placeholder-687"><a href="#Scan.make_placeholder-687"><span class="linenos">687</span></a>        <span class="k">return</span> <span class="n">scan</span>
 </span></pre></div>
 
 
@@ -2686,6 +2710,9 @@ Prefers scan.yaml if both exist.</p>
 
 <ul>
 <li><strong>slide_id</strong>:  the slide ID</li>
+<li><strong>n_tile</strong>:  the number of this tile, which will become the number of
+tiles in the scan</li>
+<li><strong>n_roi</strong>:  the number of ROIs in the scan</li>
 </ul>
 
 <h6 id="returns">Returns</h6>

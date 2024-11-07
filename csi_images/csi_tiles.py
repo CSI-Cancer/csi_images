@@ -6,7 +6,9 @@ based on their position in the scan.
 
 import typing
 
-from csi_images import csi_scans
+import numpy as np
+
+from csi_images.csi_scans import Scan
 
 
 class Tile:
@@ -16,9 +18,7 @@ class Tile:
     helper functions that allow for gathering tiles based on their position in the scan.
     """
 
-    def __init__(
-        self, scan: csi_scans.Scan, coordinates: int | tuple[int, int], n_roi: int = 0
-    ):
+    def __init__(self, scan: Scan, coordinates: int | tuple[int, int], n_roi: int = 0):
         self.scan = scan
         tile_rows = scan.roi[n_roi].tile_rows
         tile_cols = scan.roi[n_roi].tile_cols
@@ -26,20 +26,20 @@ class Tile:
         # Check that the n_roi is valid
         if n_roi >= len(self.scan.roi):
             raise ValueError(f"n_roi {n_roi} is out of bounds for scan.")
-        self.n_roi = n_roi
-        if isinstance(coordinates, int):
+        self.n_roi = int(n_roi)
+        if np.issubdtype(type(coordinates), np.integer):
             # We received "n" as the coordinates
             if 0 > coordinates or coordinates > total_tiles:
                 raise ValueError(
                     f"n ({coordinates}) must be between 0 and the "
                     f"number of tiles in ROI {self.n_roi} ({total_tiles})."
                 )
-            self.n = coordinates
+            self.n = int(coordinates)
             self.x, self.y = self.n_to_position()
         elif (
-            isinstance(coordinates, tuple)
+            (isinstance(coordinates, tuple) or isinstance(coordinates, list))
             and len(coordinates) == 2
-            and all([isinstance(coord, int) for coord in coordinates])
+            and all([np.issubdtype(type(coord), np.integer) for coord in coordinates])
         ):
             # We received (x, y) as the coordinates
             if 0 > coordinates[0] or coordinates[0] >= tile_cols:
@@ -52,8 +52,12 @@ class Tile:
                     f"y ({coordinates[1]}) must be between 0 and the "
                     f"number of rows in ROI {self.n_roi} ({tile_rows})."
                 )
-            self.x, self.y = coordinates
+            self.x, self.y = int(coordinates[0]), int(coordinates[1])
             self.n = self.position_to_n()
+        else:
+            raise ValueError(
+                "Coordinates must be an integer n or a tuple of (x, y) coordinates."
+            )
 
     def __repr__(self) -> str:
         return f"{self.scan.slide_id}-{self.n}"
@@ -114,7 +118,7 @@ class Tile:
     @classmethod
     def get_tiles(
         cls,
-        scan: csi_scans.Scan,
+        scan: Scan,
         coordinates: list[int] | list[tuple[int, int]] = None,
         n_roi: int = 0,
         as_flat: bool = True,
@@ -141,7 +145,7 @@ class Tile:
                 tiles.append(cls(scan, coordinate, n_roi))
         else:
             if coordinates is None:
-                # Populate coordinates with all (x, y) pairs.
+                # Populate coordinates with all (x, y) pairs in row-major order
                 coordinates = []
                 for y in range(scan.roi[n_roi].tile_rows):
                     for x in range(scan.roi[n_roi].tile_cols):
@@ -175,7 +179,7 @@ class Tile:
     @classmethod
     def get_tiles_by_row_col(
         cls,
-        scan: csi_scans.Scan,
+        scan: Scan,
         rows: list[int] = None,
         cols: list[int] = None,
         n_roi: int = 0,
@@ -210,7 +214,7 @@ class Tile:
     @classmethod
     def get_tiles_by_xy_bounds(
         cls,
-        scan: csi_scans.Scan,
+        scan: Scan,
         bounds: tuple[int, int, int, int],
         n_roi: int = 0,
         as_flat: bool = True,
