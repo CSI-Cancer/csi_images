@@ -1,6 +1,6 @@
 [project]
 name = "csi_images"
-version = "1.1.0"
+version = "1.0.0"
 description = "CSI-Cancer image data structure and basic processing."
 requires-python = ">=3.11"
 authors = [
@@ -26,7 +26,11 @@ Homepage = "https://github.com/CSI-Cancer/csi_images"
 Issues = "https://github.com/CSI-Cancer/csi_images/issues"
 
 [project.scripts]
-make_docs = "csi_images.make_docs:main"
+make_docs_for_csi_images = "csi_images.make_docs:main"
+
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
 
 [tool.pytest.ini_options]
 minversion = "7.0"
