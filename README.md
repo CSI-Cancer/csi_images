@@ -74,9 +74,6 @@ make_docs_csi_images
 
 ## Installation
 
-If you haven't yet, make sure
-to [set up an SSH key for GitHub](https://docs.github.com/en/authentication/connecting-to-github-with-ssh/generating-a-new-ssh-key-and-adding-it-to-the-ssh-agent).
-
 1. Activate your `conda` (`conda activate yourenv`) or
    `venv` (`source path/to/your/venv/bin/activate`) environment first.
 2. Clone `csi_images` and install:
