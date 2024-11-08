@@ -32,8 +32,6 @@ This package contains these helpful modules:
         * `get_frames()`: gets the frames of a tile.
         * `get_all_frames()`: gets all of the frames of a scan.
         * `make_rgb_image()`: creates an RGB image from the frames.
-        * `make_rgbw_image()`: creates an RGBW image from the frames. A superset of
-          `make_rgb_image()`, but both exist for convenience and clarity.
 6. `csi_events.py`: a module for interacting with individual events. Imports
    `csi_scans.py`, `csi_tiles.py`, and `csi_frames.py`.
     * `Event`: a class for containing an event's metadata and feature data. Key metadata
