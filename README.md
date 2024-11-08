@@ -1,9 +1,14 @@
-# csi_images
+# [csi_images](https://pypi.org/project/csi-images/)
 
 This package contains classes and functions for interacting with images and image data.
 While much of the functionality is specific to the CSI-Cancer organization, some of the
 functionality and structure may be beneficial for the broader community.
 Other packages in the CSI-Cancer organization may depend on this package.
+
+Install with: 
+```
+pip install csi_images
+```
 
 ## Structure
 
@@ -72,7 +77,7 @@ have [installed the package](#installation) and then run:
 make_docs_csi_images
 ```
 
-## Installation
+## Development Installation
 
 1. Activate your `conda` (`conda activate yourenv`) or
    `venv` (`source path/to/your/venv/bin/activate`) environment first.
