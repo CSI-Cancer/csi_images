@@ -25,6 +25,20 @@ def test_getting_frames():
     assert len(frames[0][0]) == 4
 
 
+def test_checking_frames():
+    scan = csi_scans.Scan.load_yaml("tests/data")
+    tile = csi_tiles.Tile(scan, 100)
+    frames = csi_frames.Frame.get_frames(tile)
+    assert len(frames) == 4
+    for frame in frames:
+        assert frame.check_image()
+    assert csi_frames.Frame.check_all_images(scan)
+    # Manually set up a frame that shouldn't exist
+    tile.x = 100
+    for frame in csi_frames.Frame.get_frames(tile):
+        assert not frame.check_image()
+
+
 def test_make_rgb():
     scan = csi_scans.Scan.load_txt("tests/data")
     tile = csi_tiles.Tile(scan, 1000)

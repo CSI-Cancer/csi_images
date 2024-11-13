@@ -11,9 +11,9 @@ import typing
 import tifffile
 import numpy as np
 
-from csi_images.csi_scans import Scan
-from csi_images.csi_tiles import Tile
-from csi_images import csi_image_utils
+from .csi_scans import Scan
+from .csi_tiles import Tile
+from . import csi_images
 
 
 class Frame:
@@ -123,6 +123,48 @@ class Frame:
     def _get_jpeg_image(self, input_path: str) -> np.ndarray:
         raise NotImplementedError("JPEG image loading not yet implemented.")
 
+    def check_image(self, input_path: str = None) -> bool:
+        """
+        Check if the image for this frame exists.
+        :param input_path: the path to the scan's directory. If None, defaults to
+                           the path loaded in the frame's tile's scan object.
+        :return: whether the image exists.
+        """
+        file_path = self.get_file_path(input_path)
+        # 72 is the minimum size for a valid TIFF file
+        if os.path.exists(file_path) and os.path.getsize(file_path) > 72:
+            return True
+        else:
+            # Alternative: could be a .jpg/.jpeg file, test both
+            jpeg_path = os.path.splitext(file_path)[0] + ".jpg"
+            if os.path.exists(jpeg_path) and os.path.getsize(jpeg_path) > 107:
+                file_path = jpeg_path
+            jpeg_path = os.path.splitext(file_path)[0] + ".jpeg"
+            if os.path.exists(jpeg_path) and os.path.getsize(jpeg_path) > 107:
+                file_path = jpeg_path
+            # If we've found a .jpg/.jpeg, it must have a .tags file with it
+            if file_path == jpeg_path:
+                tags_path = os.path.splitext(file_path)[0] + ".tags"
+                # Tags are text files that should include at least a few bytes
+                if os.path.exists(tags_path) and os.path.getsize(tags_path) > 20:
+                    return True
+        # Didn't hit any of those, return false
+        return False
+
+    @classmethod
+    def check_all_images(cls, scan: Scan):
+        """
+        Check if all images for a scan exist, either in .tif or .jpg form.
+        :param scan:
+        :return:
+        """
+        for n in range(len(scan.roi)):
+            for frames in cls.get_all_frames(scan, n_roi=n):
+                for frame in frames:
+                    if not frame.check_image():
+                        return False
+        return True
+
     @classmethod
     def get_frames(
         cls, tile: Tile, channels: tuple[int | str] = None
@@ -193,4 +235,4 @@ class Frame:
             image = Frame(tile.scan, tile, channel_index).get_image(input_path)
             images.append(image)
             colors.append(color)
-        return csi_image_utils.make_rgb(images, colors)
+        return csi_images.make_rgb(images, colors)
