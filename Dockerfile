@@ -25,7 +25,7 @@ ENV PATH=/venv/bin:$PATH
 COPY $PACKAGE_NAME /$PACKAGE_NAME/$PACKAGE_NAME
 COPY examples /$PACKAGE_NAME/examples
 COPY tests /$PACKAGE_NAME/tests
-COPY pyproject.toml requirements.txt /$PACKAGE_NAME/
+COPY pyproject.toml requirements.txt README.md /$PACKAGE_NAME/
 RUN pip install .
 
 ENTRYPOINT [ "bash" ]

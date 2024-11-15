@@ -8,16 +8,18 @@ to the position in the scanner or slide coordinate positions. See the
 csi_utils.csi_scans documentation page for more information on the coordinate systems.
 """
 
+import os
 import math
-import os.path
 import typing
 
 import numpy as np
 import pandas as pd
 
-from csi_images.csi_scans import Scan
-from csi_images.csi_tiles import Tile
-from csi_images.csi_frames import Frame
+import pyreadr
+
+from .csi_scans import Scan
+from .csi_tiles import Tile
+from .csi_frames import Frame
 
 
 class Event:
@@ -122,7 +124,7 @@ class Event:
         return float(slide_position[0][0]), float(slide_position[1][0])
 
     def crop_images(
-        self, images: list[np.ndarray], crop_size: int = 50, in_pixels: bool = True
+        self, images: list[np.ndarray], crop_size: int = 100, in_pixels: bool = True
     ) -> list[np.ndarray]:
         """
         Get the event crops from the frame images. Called "get" because it does not
@@ -176,7 +178,7 @@ class Event:
         return cropped_images
 
     def extract_images(
-        self, crop_size: int = 50, in_pixels: bool = True
+        self, crop_size: int = 100, in_pixels: bool = True
     ) -> list[np.ndarray]:
         """
         Extract the images from the scan and tile, reading from the file. Called
@@ -205,7 +207,7 @@ class Event:
         TODO: test this function
         :param events: the events to extract images for.
         :param crop_size: the square size of the image crop to get for this event.
-                          Defaults to twice the size of the event.
+                          Defaults to four times the size of the event.
         :param in_pixels: whether the crop size is in pixels or micrometers.
                           Defaults to pixels, and is ignored if crop_size is None.
         :return: a list of lists of cropped images for each event.
@@ -323,6 +325,22 @@ class EventArray:
                 return False
 
         return is_equal
+
+    def sort(self, by: str | list[str], ascending: bool = True) -> typing.Self:
+        """
+        Sort the EventArray by a column in the info, metadata, or features DataFrames.
+        :param by: name of the column to sort by.
+        :param ascending: whether to sort in ascending order.
+        :return:
+        """
+        everything = pd.concat([self.info, self.metadata, self.features], axis=1)
+        order = everything.sort_values(by=by, ascending=ascending).index
+        self.info = self.info.loc[order].reset_index(drop=True)
+        if self.metadata is not None:
+            self.metadata = self.metadata.loc[order].reset_index(drop=True)
+        if self.features is not None:
+            self.features = self.features.loc[order].reset_index(drop=True)
+        return self
 
     def add_metadata(self, new_metadata: pd.DataFrame) -> None:
         """
@@ -570,3 +588,281 @@ class EventArray:
             metadata = store.get("metadata") if "metadata" in store else None
             features = store.get("features") if "features" in store else None
         return cls(info=info, metadata=metadata, features=features)
+
+    @classmethod
+    def load_ocular(
+        cls,
+        input_path: str,
+        event_type="cells",
+        cell_data_files=(
+            "rc-final1.rds",
+            "rc-final2.rds",
+            "rc-final3.rds",
+            "rc-final4.rds",
+            "ocular_interesting.rds",
+        ),
+        others_data_files=(
+            "others-final1.rds",
+            "others-final2.rds",
+            "others-final3.rds",
+            "others-final4.rds",
+        ),
+        atlas_data_files=(
+            "ocular_interesting.rds",
+            "ocular_not_interesting.rds",
+        ),
+        merge_event_data_with_stats=True,
+        filter_and_generate_morphs=True,
+        drop_common_events=True,
+        log=None,
+    ) -> typing.Self:
+        """
+
+        :param input_path:
+        :param event_type:
+        :param cell_data_files:
+        :param others_data_files:
+        :param atlas_data_files:
+        :param merge_event_data_with_stats:
+        :param filter_and_generate_morphs:
+        :param drop_common_events:
+        :param log:
+        :return:
+        """
+        # Check if the input path is a directory or a file
+        if os.path.isfile(input_path):
+            data_files = [os.path.basename(input_path)]
+            input_path = os.path.dirname(input_path)
+        if event_type == "cells":
+            data_files = cell_data_files
+        elif event_type == "others":
+            data_files = others_data_files
+        else:
+            raise ValueError("Invalid event type.")
+
+        # Load the data from the OCULAR files
+        file_data = {}
+        for file in data_files:
+            file_path = os.path.join(input_path, file)
+            if not os.path.isfile(file_path):
+                if log is not None:
+                    log.warning(f"{file} not found for in {input_path}")
+                continue
+            file_data[file] = pyreadr.read_r(file_path)
+            # Get the DataFrame associated with None (pyreadr dict quirk)
+            file_data[file] = file_data[file][None]
+            if len(file_data[file]) == 0:
+                # File gets dropped from the dict
+                file_data.pop(file)
+                if log is not None:
+                    log.warning(f"{file} has no cells")
+                continue
+
+            if log is not None:
+                log.debug(f"{file} has {len(file_data[file])} cells")
+
+            # Drop common cells if requested and in this file
+            if file in atlas_data_files and drop_common_events:
+                common_cell_indices = (
+                    file_data[file]["catalogue_classification"] == "common_cell"
+                )
+                if log is not None:
+                    log.debug(
+                        f"Dropping {int(pd.Series.sum(common_cell_indices))}"
+                        f"common cells from {file}"
+                    )
+                file_data[file] = file_data[file][common_cell_indices == False]
+
+            if len(file_data[file]) == 0:
+                # File gets dropped from the dict
+                file_data.pop(file)
+                if log is not None:
+                    log.warning(f"{file} has no cells after dropping common cells")
+                continue
+
+            # Extract frame_id and cell_id
+            # DAPI- events already have frame_id cell_id outside rowname
+            if event_type == "cells":
+                file_data[file]["rowname"] = file_data[file]["rowname"].astype("str")
+                # get frame_id cell_id from rownames column and split into two columns
+                split_res = file_data[file]["rowname"].str.split(" ", n=1, expand=True)
+                if len(split_res.columns) != 2:
+                    log.warning(
+                        f'Expected "frame_id cell_id" but got {file_data[file]["rowname"]}'
+                    )
+                # then assign it back to the dataframe
+                file_data[file][["frame_id", "cell_id"]] = split_res.astype("int")
+            # reset indexes since they can cause NaN values in concat
+            file_data[file].reset_index(drop=True, inplace=True)
+
+        # Merge the data from all files
+        if len(file_data) == 0:
+            return EventArray()
+        elif len(file_data) == 1:
+            data = [file_data[file] for file in file_data.keys()][0]
+        else:
+            data = pd.concat(file_data.values())
+
+        if log is not None:
+            log.debug(f"Gathered a total of {len(data)} events")
+
+        # Others is missing the "slide_id". Insert it right before "frame_id" column
+        if event_type == "others" and "slide_id" not in data.columns:
+            if os.path.basename(input_path) == "ocular":
+                slide_id = os.path.basename(os.path.dirname(input_path))
+            else:
+                slide_id = "UNKNOWN"
+            data.insert(data.columns.get_loc("frame_id"), "slide_id", slide_id)
+
+        # Sort according to ascending cell_id to keep the original, which is in manual_df
+        data = data.sort_values(by=["cell_id"], ascending=True)
+        # Filter out duplicates by x & y
+        data = data.assign(
+            unique_id=data["slide_id"]
+            + "_"
+            + data["frame_id"].astype(str)
+            + "_"
+            + data["cellx"].astype(int).astype(str)
+            + "_"
+            + data["celly"].astype(int).astype(str)
+        )
+        data = data.drop_duplicates(subset=["unique_id"], keep="first", inplace=False)
+        # Filter out duplicates by cell_id
+        data = data.assign(
+            unique_id=data["slide_id"]
+            + "_"
+            + data["frame_id"].astype(str)
+            + "_"
+            + data["cell_id"].astype(str)
+        )
+        data.reset_index(drop=True, inplace=True)
+        # All columns up to "slide_id" are features; drop the "slide_id"
+        features = data.loc[:, :"slide_id"].iloc[:, :-1]
+        data = data.loc[:, "slide_id":]
+        # Grab the info columns
+        info = data[["slide_id", "frame_id", "cellx", "celly"]]
+        info.columns = ["slide_id", "tile", "x", "y"]
+        info = info.assign(
+            roi=0,  # OCULAR only works on 1 ROI, as far as known
+            size=25,  # Static, for later montaging
+        )
+        info = info[["slide_id", "tile", "roi", "x", "y", "size"]]
+        # Metadata has duplicate columns for later convenience
+        metadata = data
+        return EventArray(info, metadata, features)
+
+    def save_ocular(self, output_path: str, event_type: str = "cells") -> bool:
+        """
+        Save the events to an OCULAR file. Relies on the dataframe originating
+        from an OCULAR file (same columns; duplicate metadata/info).
+        :param output_path:
+        :return:
+        """
+        if event_type == "cells":
+            file_stub = "rc-final"
+        elif event_type == "others":
+            file_stub = "others-final"
+        else:
+            raise ValueError("Invalid event type. Must be cells or others.")
+
+        # Check for the "ocular_interesting" column
+        if event_type == "cells" and "ocular_interesting" in self.metadata.columns:
+            interesting = self.metadata["ocular_interesting"]
+            # Split the metadata into interesting and regular
+            # Interesting will only have dropped columns, with no internal changes
+            interesting = pd.concat(
+                [self.features[interesting], self.metadata[interesting]], axis=1
+            ).reset_index(drop=True)
+            # Data will get some columns changed, so copy it
+            data = (
+                pd.concat(
+                    [self.features[~interesting], self.metadata[~interesting]], axis=1
+                )
+                .copy(deep=True)
+                .reset_index(drop=True)
+                .drop(columns=["ocular_interesting"])
+            )
+
+            # Drop particular columns for "interesting"
+            interesting = interesting.drop(
+                [
+                    "clust",
+                    "hcpc",
+                    "frame_id",
+                    "cell_id",
+                    "unique_id",
+                    "ocular_interesting",
+                ],
+                axis=1,
+            )
+            # Save both .csv and .rds
+            interesting.to_csv(
+                os.path.join(output_path, "ocular_interesting.csv"), index=False
+            )
+            pyreadr.write_rds(
+                os.path.join(output_path, "ocular_interesting.rds"), interesting
+            )
+        else:
+            # Get all data, copying it
+            data = (
+                pd.concat([self.features, self.metadata], axis=1)
+                .copy(deep=True)
+                .reset_index(drop=True)
+            )
+
+        # Split based on cluster number to conform to *-final[1-4].rds
+        n_clusters = max(data["clust"]) + 1
+        split_idx = [round(i * n_clusters / 4) for i in range(5)]
+        for i in range(4):
+            subset = (split_idx[i] <= data["clust"]) & (
+                data["clust"] < split_idx[i + 1]
+            )
+            subset = data[subset].reset_index(drop=True)
+            subset["hcpc"] = i + 1
+            pyreadr.write_rds(
+                os.path.join(output_path, f"{file_stub}{i+1}.rds"), subset
+            )
+
+        # Create new example cell strings
+        data["example_cell_id"] = (
+            data["slide_id"]
+            + " "
+            + data["frame_id"].astype(str)
+            + " "
+            + data["cell_id"].astype(str)
+            + " "
+            + data["cellx"].astype(int).astype(str)
+            + " "
+            + data["celly"].astype(int).astype(str)
+        )
+        # Find averagable data columns
+        if "cellcluster_id" in data.columns:
+            avg_cols = data.columns[: data.columns.get_loc("cellcluster_id")].tolist()
+        else:
+            avg_cols = data.columns[: data.columns.get_loc("slide_id")].tolist()
+        # Group by cluster and average
+        data = data.groupby("clust").agg(
+            **{col: (col, "mean") for col in avg_cols},
+            count=("clust", "size"),  # count rows in each cluster
+            example_cells=("example_cell_id", lambda x: ",".join(x)),
+            hcpc=("hcpc", lambda x: x.iloc[0]),
+        )
+        data = data.reset_index()  # Do NOT drop, index is "clust"
+        # Create new columns
+        metadata = pd.DataFrame(
+            {
+                "count": data["count"],
+                "example_cells": data["example_cells"],
+                "clust": data["clust"].astype(int),
+                "hcpc": data["hcpc"].astype(int),
+                "id": data["clust"].astype(int).astype(str),
+                "cccluster": "0",  # Dummy value
+                "ccdistance": 0.0,  # Dummy value
+                "rownum": list(range(len(data))),
+                "framegroup": 0,  # Dummy value
+            }
+        )
+        data = pd.concat([data.loc[:, avg_cols], metadata], axis=1)
+        # Save the data
+        data.to_csv(os.path.join(output_path, f"{file_stub}.csv"), index=False)
+        pyreadr.write_rds(os.path.join(output_path, f"{file_stub}.rds"), data)

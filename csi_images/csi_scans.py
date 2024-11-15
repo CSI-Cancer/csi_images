@@ -343,7 +343,8 @@ class Scan(yaml.YAMLObject):
         scan = cls()
 
         scan.slide_id = metadata_xml.find(".//Label/Barcodes/Barcode/Content").text
-        scan.slide_id = scan.slide_id.strip().upper()
+        if scan.slide_id is not None:
+            scan.slide_id = scan.slide_id.strip().upper()
         # Map the raw scanner ID (service ID) to our IDs
         scan.scanner_id = cls.SCANNER_IDS[
             metadata_xml.find(".//Microscope/UserDefinedName").text

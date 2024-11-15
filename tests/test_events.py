@@ -80,7 +80,7 @@ def test_getting_many_events():
 
     # Test time to extract images in parallel
     start_time = time.time()
-    images_2 = csi_events.Event.extract_images_for_list(events, crop_size=50)
+    images_2 = csi_events.Event.extract_images_for_list(events, crop_size=100)
     parallel_time = time.time() - start_time
     assert parallel_time < sequential_time
     for list_a, list_b in zip(images_1, images_2):
@@ -93,10 +93,11 @@ def test_getting_many_events():
     remade_events = event_array.to_events(
         [scan], ignore_metadata=True, ignore_features=True
     )
-    images_3 = csi_events.Event.extract_images_for_list(
-        remade_events,
-        crop_size=50,
-    )
+    images_3 = csi_events.Event.extract_images_for_list(remade_events, crop_size=100)
+    for list_a, list_b in zip(images_1, images_3):
+        assert len(list_a) == len(list_b)
+        for image_a, image_b in zip(list_a, list_b):
+            assert np.array_equal(image_a, image_b)
 
 
 def test_event_coordinates_for_bzscanner():
@@ -207,3 +208,45 @@ def test_eventarray_conversions():
     assert event_array.save_hdf5("tests/data/events.h5")
     assert event_array == csi_events.EventArray.load_hdf5("tests/data/events.h5")
     os.remove("tests/data/events.h5")
+
+
+def test_ocular_conversions():
+    scan = csi_scans.Scan.load_txt("tests/data")
+    input_path = "/mnt/HDSCA_Development/DZ/0B58703/ocular"
+    result = csi_events.EventArray.load_ocular(input_path)
+    # For the purposes of this test, we will manually relabel "clust" == nan to 0
+    # These come from ocular_interesting.rds, which does not have clusters
+    result.metadata["clust"] = result.metadata["clust"].fillna(0)
+    result.metadata["hcpc"] = result.metadata["hcpc"].fillna(0)
+    result.save_ocular("tests/data")
+    new_result = csi_events.EventArray.load_ocular("tests/data")
+    # Sort them so that they are in the same order
+    result.sort(["tile", "x", "y"])
+    new_result.sort(["tile", "x", "y"])
+    # Note: hcpc method within ocularr and here are different
+    result.metadata["hcpc"] = new_result.metadata["hcpc"].copy(deep=True)
+    assert result == new_result
+    # Clean up
+    os.remove("tests/data/rc-final.csv")
+    os.remove("tests/data/rc-final.rds")
+    os.remove("tests/data/rc-final1.rds")
+    os.remove("tests/data/rc-final2.rds")
+    os.remove("tests/data/rc-final3.rds")
+    os.remove("tests/data/rc-final4.rds")
+
+    # Try it with "others" files
+    result = csi_events.EventArray.load_ocular(input_path, event_type="others")
+    result.save_ocular("tests/data", event_type="others")
+    new_result = csi_events.EventArray.load_ocular("tests/data", event_type="others")
+    result.sort(["tile", "x", "y"])
+    new_result.sort(["tile", "x", "y"])
+    # Note: hcpc method within ocularr and here are different
+    result.metadata["hcpc"] = new_result.metadata["hcpc"].copy(deep=True)
+    assert result == new_result
+    # Clean up
+    os.remove("tests/data/others-final.csv")
+    os.remove("tests/data/others-final.rds")
+    os.remove("tests/data/others-final1.rds")
+    os.remove("tests/data/others-final2.rds")
+    os.remove("tests/data/others-final3.rds")
+    os.remove("tests/data/others-final4.rds")
