@@ -29,9 +29,8 @@ class Event:
     metadata and features are stored as DataFrames.
     """
 
-    # 2D homogenous transformation matrices
-    # Translations (final column) are in micrometers (um)
     SCAN_TO_SLIDE_TRANSFORM = {
+        # Axioscan zero is in the top-right corner instead of top-left
         Scan.Type.AXIOSCAN7: np.array(
             [
                 [1, 0, 75000],
@@ -58,7 +57,7 @@ class Event:
     [affine transformations](https://en.wikipedia.org/wiki/Transformation_matrix#Affine_transformations).
     
     Transformations are nominal, and accuracy is not guaranteed; this is due to 
-    imperfections in slides and alignment in the scanners. 
+    imperfections in slides and alignment in the scanners. Units are in micrometers.
     """
 
     def __init__(
