@@ -1,5 +1,7 @@
 # [csi_images](https://pypi.org/project/csi-images/)
 
+[![Coverage Badge](docs/theme/coverage.svg)](https://csi-cancer.github.io/csi_images/coverage)
+
 This package contains classes and functions for interacting with images and image data.
 While much of the functionality is specific to the CSI-Cancer organization, some of the
 functionality and structure may be beneficial for the broader community.

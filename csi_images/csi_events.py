@@ -259,7 +259,10 @@ class EventArray:
     ):
         # Info must be a DataFrame with columns "slide_id", "tile", "roi", "x", "y", "size"
         if info is not None and (
-            not all(col in info.columns for col in self.INFO_COLUMNS)
+            not all(
+                col in info.columns
+                for col in ["slide_id", "tile", "roi", "x", "y", "size"]
+            )
             or len(info.columns) != 6
         ):
             raise ValueError(
@@ -325,21 +328,84 @@ class EventArray:
 
         return is_equal
 
-    def sort(self, by: str | list[str], ascending: bool = True) -> typing.Self:
+    def get_sort_order(self, by: str | list[str], ascending: bool | list[bool] = True):
         """
-        Sort the EventArray by a column in the info, metadata, or features DataFrames.
-        :param by: name of the column to sort by.
-        :param ascending: whether to sort in ascending order.
-        :return:
+        Get the sort order for the EventArray by a column in the info, metadata, or features DataFrames.
+        :param by: name of the column(s) to sort by.
+        :param ascending: whether to sort in ascending order; can be a list to match by
+        :return: the order of the indices to sort by.
         """
-        everything = pd.concat([self.info, self.metadata, self.features], axis=1)
-        order = everything.sort_values(by=by, ascending=ascending).index
-        self.info = self.info.loc[order].reset_index(drop=True)
+        columns = self.get(by)
+        return columns.sort_values(by=by, ascending=ascending).index
+
+    def sort(
+        self, by: str | list[str], ascending: bool | list[bool] = True
+    ) -> typing.Self:
+        """
+        Sort the EventArray by column(s) in the info, metadata, or features DataFrames.
+        :param by: name of the column(s) to sort by.
+        :param ascending: whether to sort in ascending order; can be a list to match by
+        :return: a new, sorted EventArray.
+        """
+        order = self.get_sort_order(by, ascending)
+        info = self.info.loc[order].reset_index(drop=True)
         if self.metadata is not None:
-            self.metadata = self.metadata.loc[order].reset_index(drop=True)
+            metadata = self.metadata.loc[order].reset_index(drop=True)
+        else:
+            metadata = None
         if self.features is not None:
-            self.features = self.features.loc[order].reset_index(drop=True)
-        return self
+            features = self.features.loc[order].reset_index(drop=True)
+        else:
+            features = None
+        return EventArray(info, metadata, features)
+
+    def get(self, column_names: int | str | list[int] | list[str]) -> pd.DataFrame:
+        """
+        Get a DataFrame with the specified columns from the EventArray, by value.
+        :param column_names: the names of the columns to get.
+        :return: a DataFrame with the specified columns.
+        """
+        if isinstance(column_names, str):
+            column_names = [column_names]
+        columns = []
+        for column_name in column_names:
+            if column_name in self.info.columns:
+                columns.append(self.info[column_name])
+            elif self.metadata is not None and column_name in self.metadata.columns:
+                columns.append(column_name)
+            elif self.features is not None and column_name in self.features.columns:
+                columns.append(column_name)
+            else:
+                raise ValueError(f"Column {column_name} not found in EventArray")
+        return pd.concat(columns, axis=1)
+
+    def rows(self, rows) -> typing.Self:
+        """
+        Get a subset of the EventArray rows based on a boolean or integer index, by value.
+        :param rows: the indices to get as a 1D boolean/integer list/array/series
+        :return: a new EventArray with the subset of events.
+        """
+        info = self.info.loc[rows].reset_index(drop=True)
+        if self.metadata is not None:
+            metadata = self.metadata.loc[rows].reset_index(drop=True)
+        else:
+            metadata = None
+        if self.features is not None:
+            features = self.features.loc[rows].reset_index(drop=True)
+        else:
+            features = None
+        return EventArray(info, metadata, features)
+
+    def copy(self) -> typing.Self:
+        """
+        Create a deep copy of the EventArray.
+        :return: a deep copy of the EventArray.
+        """
+        return EventArray(
+            info=self.info.copy(),
+            metadata=None if self.metadata is None else self.metadata.copy(),
+            features=None if self.features is None else self.features.copy(),
+        )
 
     def add_metadata(self, new_metadata: pd.DataFrame) -> None:
         """
@@ -352,7 +418,7 @@ class EventArray:
             self.metadata = new_metadata
         else:
             # Add the new metadata columns to the existing metadata
-            self.metadata = pd.concat([self.metadata, new_metadata], axis=1)
+            self.metadata = pd.concat([self.metadata, new_metadata], axis=1, copy=False)
 
     def add_features(self, new_features: pd.DataFrame) -> None:
         """
@@ -368,7 +434,7 @@ class EventArray:
             self.features = pd.concat([self.features, new_features], axis=1)
 
     @classmethod
-    def from_list(cls, events: list[typing.Self]) -> typing.Self:
+    def merge(cls, events: list[typing.Self]) -> typing.Self:
         """
         Combine EventArrays in a list into a single EventArray.
         :param events: the new list of events.
@@ -692,7 +758,7 @@ class EventArray:
                 # then assign it back to the dataframe
                 file_data[file][["frame_id", "cell_id"]] = split_res.astype("int")
             # reset indexes since they can cause NaN values in concat
-            file_data[file].reset_index(drop=True, inplace=True)
+            file_data[file] = file_data[file].reset_index(drop=True)
 
         # Merge the data from all files
         if len(file_data) == 0:
@@ -725,7 +791,7 @@ class EventArray:
             + "_"
             + data["celly"].astype(int).astype(str)
         )
-        data = data.drop_duplicates(subset=["unique_id"], keep="first", inplace=False)
+        data = data.drop_duplicates(subset=["unique_id"], keep="first")
         # Filter out duplicates by cell_id
         data = data.assign(
             unique_id=data["slide_id"]
@@ -734,7 +800,7 @@ class EventArray:
             + "_"
             + data["cell_id"].astype(str)
         )
-        data.reset_index(drop=True, inplace=True)
+        data = data.reset_index(drop=True)
         # All columns up to "slide_id" are features; drop the "slide_id"
         features = data.loc[:, :"slide_id"].iloc[:, :-1]
         data = data.loc[:, "slide_id":]
@@ -772,12 +838,11 @@ class EventArray:
             interesting = pd.concat(
                 [self.features[interesting], self.metadata[interesting]], axis=1
             ).reset_index(drop=True)
-            # Data will get some columns changed, so copy it
+            # Data will get some columns changed; reset_index will copy it
             data = (
                 pd.concat(
                     [self.features[~interesting], self.metadata[~interesting]], axis=1
                 )
-                .copy(deep=True)
                 .reset_index(drop=True)
                 .drop(columns=["ocular_interesting"])
             )
@@ -802,11 +867,9 @@ class EventArray:
                 os.path.join(output_path, "ocular_interesting.rds"), interesting
             )
         else:
-            # Get all data, copying it
-            data = (
-                pd.concat([self.features, self.metadata], axis=1)
-                .copy(deep=True)
-                .reset_index(drop=True)
+            # Get all data and reset_index (will copy it)
+            data = pd.concat([self.features, self.metadata], axis=1).reset_index(
+                drop=True
             )
 
         # Split based on cluster number to conform to *-final[1-4].rds
@@ -861,7 +924,7 @@ class EventArray:
                 "framegroup": 0,  # Dummy value
             }
         )
-        data = pd.concat([data.loc[:, avg_cols], metadata], axis=1)
+        data = pd.concat([data[avg_cols], metadata], axis=1)
         # Save the data
         data.to_csv(os.path.join(output_path, f"{file_stub}.csv"), index=False)
         pyreadr.write_rds(os.path.join(output_path, f"{file_stub}.rds"), data)

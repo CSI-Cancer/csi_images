@@ -220,9 +220,9 @@ def test_ocular_conversions():
     result.metadata["hcpc"] = result.metadata["hcpc"].fillna(0)
     result.save_ocular("tests/data")
     new_result = csi_events.EventArray.load_ocular("tests/data")
-    # Sort them so that they are in the same order
-    result.sort(["tile", "x", "y"])
-    new_result.sort(["tile", "x", "y"])
+    # # Sort them so that they are in the same order
+    result = result.sort(["tile", "x", "y"])
+    new_result = new_result.sort(["tile", "x", "y"])
     # Note: hcpc method within ocularr and here are different
     result.metadata["hcpc"] = new_result.metadata["hcpc"].copy(deep=True)
     assert result == new_result
@@ -238,8 +238,8 @@ def test_ocular_conversions():
     result = csi_events.EventArray.load_ocular(input_path, event_type="others")
     result.save_ocular("tests/data", event_type="others")
     new_result = csi_events.EventArray.load_ocular("tests/data", event_type="others")
-    result.sort(["tile", "x", "y"])
-    new_result.sort(["tile", "x", "y"])
+    result = result.sort(["tile", "x", "y"])
+    new_result = new_result.sort(["tile", "x", "y"])
     # Note: hcpc method within ocularr and here are different
     result.metadata["hcpc"] = new_result.metadata["hcpc"].copy(deep=True)
     assert result == new_result
@@ -250,3 +250,46 @@ def test_ocular_conversions():
     os.remove("tests/data/others-final2.rds")
     os.remove("tests/data/others-final3.rds")
     os.remove("tests/data/others-final4.rds")
+
+
+def test_copy_sort_rows_get():
+    scan = csi_scans.Scan.load_yaml("tests/data")
+    # Origin
+    tile = csi_tiles.Tile(scan, 0)
+    events = [
+        csi_events.Event(scan, tile, 0, 100),
+        csi_events.Event(scan, tile, 0, 0),
+        csi_events.Event(scan, tile, 1000, 1000),
+        csi_events.Event(scan, tile, 1000, 1),
+        csi_events.Event(scan, tile, 2000, 2000),
+    ]
+
+    events = csi_events.EventArray.from_events(events)
+
+    # Copy
+    events_copy = events.copy()
+    events_copy.info["x"] = 1
+    # Check that changes to the copy did not change the original
+    assert events_copy.info["x"].equals(pd.Series([1, 1, 1, 1, 1]))
+    assert events.info["x"].equals(pd.Series([0, 0, 1000, 1000, 2000]))
+
+    # Sort
+    events = events.sort(["x", "y"], ascending=[False, True])
+    assert events.info["x"].equals(pd.Series([2000, 1000, 1000, 0, 0]))
+    assert events.info["y"].equals(pd.Series([2000, 1, 1000, 0, 100]))
+
+    # Get
+    events_get = events.get(["x", "y"])
+    assert events_get["x"].equals(pd.Series([2000, 1000, 1000, 0, 0]))
+    assert events_get["y"].equals(pd.Series([2000, 1, 1000, 0, 100]))
+    assert events_get.columns.equals(pd.Index(["x", "y"]))
+
+    # Rows
+    events_get = events.rows([0, 1, 3])
+    assert len(events_get) == 3
+    assert events_get.info["x"].equals(pd.Series([2000, 1000, 0]))
+    assert events_get.info["y"].equals(pd.Series([2000, 1, 0]))
+    events_get = events.rows([True, False, False, True, True])
+    assert len(events_get) == 3
+    assert events_get.info["x"].equals(pd.Series([2000, 0, 0]))
+    assert events_get.info["y"].equals(pd.Series([2000, 0, 100]))
