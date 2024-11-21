@@ -409,29 +409,31 @@ class EventArray:
 
     def add_metadata(self, new_metadata: pd.DataFrame) -> None:
         """
-        Add metadata to the EventArray.
+        Add metadata to the EventArray. Removes the need to check if metadata is None.
+        Overwrites any existing metadata with the same column names as the new metadata.
         :param new_metadata: the metadata to add.
         """
+        if len(self) != len(new_metadata):
+            raise ValueError("New metadata must match length of existing info")
+
         if self.metadata is None:
-            if len(self) != len(new_metadata):
-                raise ValueError("New metadata does not match length of existing info")
             self.metadata = new_metadata
         else:
-            # Add the new columns to the existing metadata (copies it)
-            self.metadata = pd.concat([self.metadata, new_metadata], axis=1)
+            self.metadata[new_metadata.columns] = new_metadata
 
     def add_features(self, new_features: pd.DataFrame) -> None:
         """
-        Add features to the EventArray.
-        :param new_features: the metadata to add.
+        Add features to the EventArray. Removes the need to check if features is None.
+        Overwrites any existing features with the same column names as the new features.
+        :param new_features: the features to add.
         """
+        if len(self) != len(new_features):
+            raise ValueError("New features must match length of existing info")
+
         if self.features is None:
-            if len(self) != len(new_features):
-                raise ValueError("New metadata does not match length of existing info")
             self.features = new_features
         else:
-            # Add the new columns to the existing features (copies it)
-            self.features = pd.concat([self.features, new_features], axis=1)
+            self.features[new_features.columns] = new_features
 
     @classmethod
     def merge(cls, events: list[typing.Self]) -> typing.Self:
