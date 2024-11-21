@@ -7,13 +7,19 @@ composite images from a tile and a set of channels.
 
 import os
 import typing
+import warnings
 
-import tifffile
 import numpy as np
 
 from .csi_scans import Scan
 from .csi_tiles import Tile
 from . import csi_images
+
+# Optional dependencies; will raise errors in particular functions if not installed
+try:
+    import tifffile
+except ImportError:
+    tifffile = None
 
 
 class Frame:
@@ -96,6 +102,11 @@ class Frame:
                            the path loaded in the frame's tile's scan object.
         :return: the array representing the image.
         """
+        if tifffile is None:
+            raise ModuleNotFoundError(
+                "tifffile library not installed. "
+                "Install csi-images with [imageio] option to resolve."
+            )
 
         file_path = self.get_file_path(input_path)
 

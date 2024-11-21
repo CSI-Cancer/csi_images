@@ -1,12 +1,16 @@
--e .
+-e .[all]
+
+pandas
+numpy
+tables
 PyYAML
 aicspylibczi
 tifffile
 imagecodecs
 scikit-image
 opencv-python
-pandas
-tables
 pyreadr
-pdoc
 pytest
+hatchling
+build
+twine

@@ -9,9 +9,24 @@ Other packages in the CSI-Cancer organization may depend on this package.
 
 Install with:
 
-```
+```commandline
 pip install csi_images
 ```
+
+or
+
+```commandline
+pip install csi_images[imageio,rds,dev,all]
+```
+
+The base version of the package includes only core data structures and manipulations.
+
+Optional dependencies include:
+
+* `imageio`: for reading and writing images, include .czi files.
+* `rds`: for reading and writing RDS files, such as OCULAR outputs.
+* `dev`: for development dependencies, including documentation, tests, building, etc.
+* `all`: for all optional dependencies.
 
 ## Structure
 

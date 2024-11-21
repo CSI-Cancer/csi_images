@@ -10,10 +10,13 @@ import datetime
 import zoneinfo
 import typing
 
-import aicspylibczi
-
 import yaml
 import json
+
+try:
+    import aicspylibczi
+except ImportError:
+    aicspylibczi = None
 
 
 class Scan(yaml.YAMLObject):
@@ -331,6 +334,12 @@ class Scan(yaml.YAMLObject):
         :param input_path: the path to the .czi file
         :return: a Scan object
         """
+        if aicspylibczi is None:
+            raise ModuleNotFoundError(
+                "aicspylibczi library not installed. "
+                "Install csi-images with [imageio] option to resolve."
+            )
+
         # Normalize paths
         input_path = os.path.abspath(input_path)
 

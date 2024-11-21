@@ -15,11 +15,15 @@ import typing
 import numpy as np
 import pandas as pd
 
-import pyreadr
-
 from .csi_scans import Scan
 from .csi_tiles import Tile
 from .csi_frames import Frame
+
+# Optional dependencies; will raise errors in particular functions if not installed
+try:
+    import pyreadr
+except ImportError:
+    pyreadr = None
 
 
 class Event:
@@ -696,6 +700,11 @@ class EventArray:
         :param log:
         :return:
         """
+        if pyreadr is None:
+            raise ModuleNotFoundError(
+                "pyreadr not installed. Install pyreadr directly "
+                "or install csi-images with [rds] option to resolve."
+            )
         # Check if the input path is a directory or a file
         if os.path.isfile(input_path):
             data_files = [os.path.basename(input_path)]
