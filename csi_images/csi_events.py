@@ -365,7 +365,7 @@ class EventArray:
         :param column_names: the names of the columns to get.
         :return: a DataFrame with the specified columns.
         """
-        if isinstance(column_names, str):
+        if isinstance(column_names, int) or isinstance(column_names, str):
             column_names = [column_names]
         columns = []
         for column_name in column_names:
@@ -417,8 +417,8 @@ class EventArray:
                 raise ValueError("New metadata does not match length of existing info")
             self.metadata = new_metadata
         else:
-            # Add the new metadata columns to the existing metadata
-            self.metadata = pd.concat([self.metadata, new_metadata], axis=1, copy=False)
+            # Add the new columns to the existing metadata (copies it)
+            self.metadata = pd.concat([self.metadata, new_metadata], axis=1)
 
     def add_features(self, new_features: pd.DataFrame) -> None:
         """
@@ -430,7 +430,7 @@ class EventArray:
                 raise ValueError("New metadata does not match length of existing info")
             self.features = new_features
         else:
-            # Add the new metadata columns to the existing metadata
+            # Add the new columns to the existing features (copies it)
             self.features = pd.concat([self.features, new_features], axis=1)
 
     @classmethod
@@ -792,7 +792,7 @@ class EventArray:
             + data["celly"].astype(int).astype(str)
         )
         data = data.drop_duplicates(subset=["unique_id"], keep="first")
-        # Filter out duplicates by cell_id
+        # Normal unique_id is with cell_id
         data = data.assign(
             unique_id=data["slide_id"]
             + "_"
@@ -858,6 +858,7 @@ class EventArray:
                     "ocular_interesting",
                 ],
                 axis=1,
+                errors="ignore",
             )
             # Save both .csv and .rds
             interesting.to_csv(
