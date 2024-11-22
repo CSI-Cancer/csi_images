@@ -8,13 +8,11 @@
 SCRIPT_DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" &> /dev/null && pwd )"
 PACKAGE_NAME=$(basename "$SCRIPT_DIR")
 
-# Build prerequisite Docker images if needed
+# Build prerequisite Docker images if needed (for private dependencies)
 PREREQUISITE_IMAGES=()
 for IMAGE in "${PREREQUISITE_IMAGES[@]}"; do
-  if [[ "$(docker images -q "$IMAGE" 2> /dev/null)" == "" ]]; then
-    # Run their make_docker.sh scripts, assuming that they're in the same directory
-    bash "$SCRIPT_DIR"/../"$IMAGE"/make_docker.sh
-  fi
+  # Run their make_docker.sh scripts, assuming that they're in the same directory
+  bash "$SCRIPT_DIR"/../"$IMAGE"/make_docker.sh
 done
 
 # Build the Docker image

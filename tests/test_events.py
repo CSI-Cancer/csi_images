@@ -224,7 +224,7 @@ def test_ocular_conversions():
     result = result.sort(["tile", "x", "y"])
     new_result = new_result.sort(["tile", "x", "y"])
     # Note: hcpc method within ocularr and here are different
-    result.metadata["hcpc"] = new_result.metadata["hcpc"].copy(deep=True)
+    result.metadata["hcpc"] = new_result.metadata["hcpc"].copy()
     assert result == new_result
     # Clean up
     os.remove("tests/data/rc-final.csv")
@@ -241,7 +241,7 @@ def test_ocular_conversions():
     result = result.sort(["tile", "x", "y"])
     new_result = new_result.sort(["tile", "x", "y"])
     # Note: hcpc method within ocularr and here are different
-    result.metadata["hcpc"] = new_result.metadata["hcpc"].copy(deep=True)
+    result.metadata["hcpc"] = new_result.metadata["hcpc"].copy()
     assert result == new_result
     # Clean up
     os.remove("tests/data/others-final.csv")

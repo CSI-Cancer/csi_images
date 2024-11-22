@@ -1,6 +1,6 @@
 [project]
 name = "csi_images"
-version = "1.2.0"
+version = "1.2.2"
 description = "CSI-Cancer image data structure and basic processing."
 requires-python = ">=3.11"
 authors = [
@@ -38,9 +38,9 @@ dev = [
     "twine",
 ]
 all = [
-    "csi-images[imageio]",
-    "csi-images[rds]",
-    "csi-images[dev]",
+    "csi_images[imageio]",
+    "csi_images[rds]",
+    "csi_images[dev]",
 ]
 
 [project.urls]

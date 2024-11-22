@@ -46,7 +46,7 @@
                     <li><a href="csi_images/csi_images.html">csi_images</a></li>
                     <li><a href="csi_images/csi_scans.html">csi_scans</a></li>
                     <li><a href="csi_images/csi_tiles.html">csi_tiles</a></li>
-                    <li><a href="csi_images/make_docs.html">make_docs</a></li>
+                    <li><a href="csi_images/ocular_files.html">ocular_files</a></li>
             </ul>
 
 
@@ -76,6 +76,22 @@ Other packages in the CSI-Cancer organization may depend on this package.</p>
 
 <pre><code>pip install csi_images
 </code></pre>
+
+<p>or</p>
+
+<pre><code>pip install csi_images[imageio,rds,dev,all]
+</code></pre>
+
+<p>The base version of the package includes only core data structures and manipulations.</p>
+
+<p>Optional dependencies include:</p>
+
+<ul>
+<li><code>imageio</code>: for reading and writing images, include .czi files.</li>
+<li><code>rds</code>: for reading and writing RDS files, such as OCULAR outputs.</li>
+<li><code>dev</code>: for development dependencies, including documentation, tests, building, etc.</li>
+<li><code>all</code>: for all optional dependencies.</li>
+</ul>
 
 <h2 id="structure">Structure</h2>
 
