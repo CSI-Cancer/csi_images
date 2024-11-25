@@ -1,4 +1,41 @@
 import numpy as np
+import pandas as pd
+from skimage.measure import regionprops_table
+
+
+def extract_mask_info(
+    mask: np.ndarray,
+) -> pd.DataFrame:
+    """
+    Extracts events from a mask.
+    :param mask: mask to extract events from
+    :return: pd.DataFrame with columns: id, x, y, size, or an empty DataFrame
+    """
+    if np.max(mask) == 0:
+        return pd.DataFrame()
+
+    # Use skimage.measure.regionprops_table to compute properties
+    info = pd.DataFrame(
+        regionprops_table(
+            mask,
+            properties=[
+                "label",
+                "centroid",
+                "axis_major_length",
+            ],
+        )
+    )
+
+    # Rename columns to match desired output
+    info = info.rename(
+        columns={
+            "label": "id",
+            "centroid-0": "y",
+            "centroid-1": "x",
+            "axis_major_length": "size",
+        },
+    )
+    return info
 
 
 def make_rgb(

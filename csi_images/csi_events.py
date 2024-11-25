@@ -10,7 +10,7 @@ csi_utils.csi_scans documentation page for more information on the coordinate sy
 
 import os
 import math
-import typing
+from typing import Self
 
 import numpy as np
 import pandas as pd
@@ -18,6 +18,7 @@ import pandas as pd
 from .csi_scans import Scan
 from .csi_tiles import Tile
 from .csi_frames import Frame
+from .csi_images import extract_mask_info
 
 # Optional dependencies; will raise errors in particular functions if not installed
 try:
@@ -199,7 +200,7 @@ class Event:
     @classmethod
     def extract_images_for_list(
         cls,
-        events: list[typing.Self],
+        events: list[Self],
         crop_size: int | list[int] = None,
         in_pixels: bool = True,
     ) -> list[list[np.ndarray]]:
@@ -342,9 +343,7 @@ class EventArray:
         columns = self.get(by)
         return columns.sort_values(by=by, ascending=ascending).index
 
-    def sort(
-        self, by: str | list[str], ascending: bool | list[bool] = True
-    ) -> typing.Self:
+    def sort(self, by: str | list[str], ascending: bool | list[bool] = True) -> Self:
         """
         Sort the EventArray by column(s) in the info, metadata, or features DataFrames.
         :param by: name of the column(s) to sort by.
@@ -383,7 +382,7 @@ class EventArray:
                 raise ValueError(f"Column {column_name} not found in EventArray")
         return pd.concat(columns, axis=1)
 
-    def rows(self, rows) -> typing.Self:
+    def rows(self, rows) -> Self:
         """
         Get a subset of the EventArray rows based on a boolean or integer index, by value.
         :param rows: the indices to get as a 1D boolean/integer list/array/series
@@ -400,7 +399,7 @@ class EventArray:
             features = None
         return EventArray(info, metadata, features)
 
-    def copy(self) -> typing.Self:
+    def copy(self) -> Self:
         """
         Create a deep copy of the EventArray.
         :return: a deep copy of the EventArray.
@@ -448,7 +447,7 @@ class EventArray:
                 self.features[new_features.columns] = new_features
 
     @classmethod
-    def merge(cls, events: list[typing.Self]) -> typing.Self:
+    def merge(cls, events: list[Self]) -> Self:
         """
         Combine EventArrays in a list into a single EventArray.
         :param events: the new list of events.
@@ -478,50 +477,6 @@ class EventArray:
             all_features = pd.concat(all_features, ignore_index=True)
 
         return EventArray(all_info, all_metadata, all_features)
-
-    @classmethod
-    def from_events(cls, events: list[Event]) -> typing.Self:
-        """
-        Set the events in the EventArray to a new list of events.
-        :param events: the new list of events.
-        """
-        # Return an empty array if we were passed nothing
-        if events is None or len(events) == 0:
-            return EventArray()
-        # Otherwise, grab the info
-        info = pd.DataFrame(
-            {
-                "slide_id": [event.scan.slide_id for event in events],
-                "tile": [event.tile.n for event in events],
-                "roi": [event.tile.n_roi for event in events],
-                "x": [event.x for event in events],
-                "y": [event.y for event in events],
-                "size": [event.size for event in events],
-            }
-        )
-        metadata_list = [event.metadata for event in events]
-        # Iterate through and ensure that all metadata is the same shape
-        for metadata in metadata_list:
-            if type(metadata) != type(metadata_list[0]):
-                raise ValueError("All metadata must be the same type.")
-            if metadata is not None and metadata.shape != metadata_list[0].shape:
-                raise ValueError("All metadata must be the same shape.")
-        if metadata_list[0] is None:
-            metadata = None
-        else:
-            metadata = pd.DataFrame(metadata_list)
-        features_list = [event.features for event in events]
-        # Iterate through and ensure that all features are the same shape
-        for features in features_list:
-            if type(features) != type(features_list[0]):
-                raise ValueError("All features must be the same type.")
-            if features is not None and features.shape != features_list[0].shape:
-                raise ValueError("All features must be the same shape.")
-        if features_list[0] is None:
-            features = None
-        else:
-            features = pd.DataFrame(features_list)
-        return EventArray(info=info, metadata=metadata, features=features)
 
     def to_events(
         self,
@@ -573,6 +528,50 @@ class EventArray:
             )
         return events
 
+    @classmethod
+    def from_events(cls, events: list[Event]) -> Self:
+        """
+        Set the events in the EventArray to a new list of events.
+        :param events: the new list of events.
+        """
+        # Return an empty array if we were passed nothing
+        if events is None or len(events) == 0:
+            return EventArray()
+        # Otherwise, grab the info
+        info = pd.DataFrame(
+            {
+                "slide_id": [event.scan.slide_id for event in events],
+                "tile": [event.tile.n for event in events],
+                "roi": [event.tile.n_roi for event in events],
+                "x": [event.x for event in events],
+                "y": [event.y for event in events],
+                "size": [event.size for event in events],
+            }
+        )
+        metadata_list = [event.metadata for event in events]
+        # Iterate through and ensure that all metadata is the same shape
+        for metadata in metadata_list:
+            if type(metadata) != type(metadata_list[0]):
+                raise ValueError("All metadata must be the same type.")
+            if metadata is not None and metadata.shape != metadata_list[0].shape:
+                raise ValueError("All metadata must be the same shape.")
+        if metadata_list[0] is None:
+            metadata = None
+        else:
+            metadata = pd.DataFrame(metadata_list)
+        features_list = [event.features for event in events]
+        # Iterate through and ensure that all features are the same shape
+        for features in features_list:
+            if type(features) != type(features_list[0]):
+                raise ValueError("All features must be the same type.")
+            if features is not None and features.shape != features_list[0].shape:
+                raise ValueError("All features must be the same shape.")
+        if features_list[0] is None:
+            features = None
+        else:
+            features = pd.DataFrame(features_list)
+        return EventArray(info=info, metadata=metadata, features=features)
+
     def to_dataframe(self) -> pd.DataFrame:
         """
         Convert all the data in the EventArray to a single DataFrame.
@@ -594,7 +593,7 @@ class EventArray:
         return output
 
     @classmethod
-    def from_dataframe(cls, df) -> typing.Self:
+    def from_dataframe(cls, df) -> Self:
         """
         From a single, special DataFrame, create an EventArray.
         :return: a DataFrame with all the data in the EventArray.
@@ -614,6 +613,48 @@ class EventArray:
             features = None
         return cls(info=info, metadata=metadata, features=features)
 
+    @classmethod
+    def from_mask(
+        cls,
+        mask: np.ndarray,
+        slide_id: str,
+        tile_n: int,
+        n_roi: int = 0,
+        include_cell_id: bool = True,
+    ) -> Self:
+        """
+        Extract events from a mask DataFrame, including metadata and features.
+        :param mask: the mask to extract events from.
+        :param slide_id: the slide ID the mask is from.
+        :param tile_n: the tile number the mask is from.
+        :param n_roi: the ROI number the mask is from.
+        :param include_cell_id: whether to include the cell_id, or numerical
+        mask label, as metadata in the EventArray.
+        :return: EventArray corresponding to the mask labels.
+        """
+        mask_info = extract_mask_info(mask)
+        if len(mask_info) == 0:
+            return EventArray()
+
+        # Combine provided info and mask info
+        info = pd.DataFrame(
+            {
+                "slide_id": slide_id,
+                "tile": tile_n,
+                "roi": n_roi,
+                "x": mask_info["x"],
+                "y": mask_info["y"],
+                "size": mask_info["size"],
+            },
+        )
+        # Extract a metadata column if desired
+        if include_cell_id:
+            metadata = pd.DataFrame({"cell_id": mask_info["id"]})
+        else:
+            metadata = None
+
+        return EventArray(info, metadata, None)
+
     def save_csv(self, output_path: str) -> bool:
         """
         Save the events to an CSV file, including metadata and features.
@@ -624,7 +665,7 @@ class EventArray:
         return os.path.exists(output_path)
 
     @classmethod
-    def load_csv(cls, input_path: str) -> typing.Self:
+    def load_csv(cls, input_path: str) -> Self:
         """
         Load the events from an CSV file, including metadata and features.
         :param input_path:
@@ -654,7 +695,7 @@ class EventArray:
         return os.path.exists(output_path)
 
     @classmethod
-    def load_hdf5(cls, input_path: str) -> typing.Self:
+    def load_hdf5(cls, input_path: str) -> Self:
         """
         Load the events from an HDF5 file, including metadata and features.
         :param input_path:
@@ -667,6 +708,130 @@ class EventArray:
             metadata = store.get("metadata") if "metadata" in store else None
             features = store.get("features") if "features" in store else None
         return cls(info=info, metadata=metadata, features=features)
+
+    def save_ocular(self, output_path: str, event_type: str = "cells"):
+        """
+        Save the events to an OCULAR file. Relies on the dataframe originating
+        from an OCULAR file (same columns; duplicate metadata/info).
+        :param output_path:
+        :param event_type:
+        :return:
+        """
+        if event_type == "cells":
+            file_stub = "rc-final"
+        elif event_type == "others":
+            file_stub = "others-final"
+        else:
+            raise ValueError("Invalid event type. Must be cells or others.")
+
+        # Check for the "ocular_interesting" column
+        if event_type == "cells":
+            if "ocular_interesting" in self.metadata.columns:
+                interesting_rows = self.metadata["ocular_interesting"].to_numpy(
+                    dtype=bool
+                )
+            elif "hcpc" in self.metadata.columns:
+                # Interesting cells don't get an hcpc designation, leaving them as -1
+                interesting_rows = (
+                    self.metadata["hcpc"].to_numpy() == -1
+                )  # interesting cells
+            else:
+                interesting_rows = []
+            if sum(interesting_rows) > 0:
+                # Split the metadata into interesting and regular
+                interesting_events = self.rows(interesting_rows)
+                interesting_df = pd.concat(
+                    [interesting_events.features, interesting_events.metadata], axis=1
+                )
+                data_events = self.rows(~interesting_rows)
+                data_df = pd.concat(
+                    [data_events.features, data_events.metadata], axis=1
+                )
+                data_df = data_df.drop(columns=["ocular_interesting"], errors="ignore")
+
+                # Drop particular columns for "interesting"
+                interesting_df = interesting_df.drop(
+                    [
+                        "clust",
+                        "hcpc",
+                        "frame_id",
+                        "cell_id",
+                        "unique_id",
+                        "ocular_interesting",
+                    ],
+                    axis=1,
+                    errors="ignore",
+                )
+                # Save both .csv and .rds
+                interesting_df.to_csv(
+                    os.path.join(output_path, "ocular_interesting.csv"), index=False
+                )
+                pyreadr.write_rds(
+                    os.path.join(output_path, "ocular_interesting.rds"), interesting_df
+                )
+            else:
+                data_df = pd.concat([self.features, self.metadata], axis=1)
+        else:
+            # Get all data and reset_index (will copy it)
+            data_df = pd.concat([self.features, self.metadata], axis=1)
+
+        # Split based on cluster number to conform to *-final[1-4].rds
+        n_clusters = max(data_df["clust"]) + 1
+        split_idx = [round(i * n_clusters / 4) for i in range(5)]
+        for i in range(4):
+            subset = (split_idx[i] <= data_df["clust"]) & (
+                data_df["clust"] < split_idx[i + 1]
+            )
+            data_df.loc[subset, "hcpc"] = i + 1
+            subset = data_df[subset].reset_index(drop=True)
+            pyreadr.write_rds(
+                os.path.join(output_path, f"{file_stub}{i+1}.rds"), subset
+            )
+
+        # Create new example cell strings
+        data_df["example_cell_id"] = (
+            data_df["slide_id"]
+            + " "
+            + data_df["frame_id"].astype(str)
+            + " "
+            + data_df["cell_id"].astype(str)
+            + " "
+            + data_df["cellx"].astype(int).astype(str)
+            + " "
+            + data_df["celly"].astype(int).astype(str)
+        )
+        # Find averagable data columns
+        if "cellcluster_id" in data_df.columns:
+            end_idx = data_df.columns.get_loc("cellcluster_id")
+        else:
+            end_idx = data_df.columns.get_loc("slide_id")
+        avg_cols = data_df.columns[:end_idx].tolist()
+        # Group by cluster and average
+        data_df = data_df.groupby("clust").agg(
+            **{col: (col, "mean") for col in avg_cols},
+            count=("clust", "size"),  # count rows in each cluster
+            example_cells=("example_cell_id", lambda x: ",".join(x)),
+            hcpc=("hcpc", lambda x: x.iloc[0]),
+        )
+        data_df = data_df.reset_index()  # Do NOT drop, index is "clust"
+        # Create new columns
+        metadata = pd.DataFrame(
+            {
+                "count": data_df["count"],
+                "example_cells": data_df["example_cells"],
+                "clust": data_df["clust"].astype(int),
+                "hcpc": data_df["hcpc"].astype(int),
+                "id": data_df["clust"].astype(int).astype(str),
+                "cccluster": "0",  # Dummy value
+                "ccdistance": 0.0,  # Dummy value
+                "rownum": list(range(len(data_df))),
+                "framegroup": 0,  # Dummy value
+            }
+        )
+        data_df = pd.concat([data_df[avg_cols], metadata], axis=1)
+        # Save the cluster data
+        data_df.to_csv(os.path.join(output_path, f"{file_stub}.csv"), index=False)
+        pyreadr.write_rds(os.path.join(output_path, f"{file_stub}.rds"), data_df)
 
     @classmethod
     def load_ocular(
@@ -692,7 +857,7 @@ class EventArray:
         ),
         drop_common_events=True,
         log=None,
-    ) -> typing.Self:
+    ) -> Self:
         """
 
         :param input_path:
@@ -843,127 +1008,3 @@ class EventArray:
             if col in metadata:
                 metadata[col] = metadata[col].fillna(-1).astype(int)
         return EventArray(info, metadata, features)
-
-    def save_ocular(self, output_path: str, event_type: str = "cells"):
-        """
-        Save the events to an OCULAR file. Relies on the dataframe originating
-        from an OCULAR file (same columns; duplicate metadata/info).
-        :param output_path:
-        :param event_type:
-        :return:
-        """
-        if event_type == "cells":
-            file_stub = "rc-final"
-        elif event_type == "others":
-            file_stub = "others-final"
-        else:
-            raise ValueError("Invalid event type. Must be cells or others.")
-
-        # Check for the "ocular_interesting" column
-        if event_type == "cells":
-            if "ocular_interesting" in self.metadata.columns:
-                interesting_rows = self.metadata["ocular_interesting"].to_numpy(
-                    dtype=bool
-                )
-            elif "hcpc" in self.metadata.columns:
-                # Interesting cells don't get an hcpc designation, leaving them as -1
-                interesting_rows = (
-                    self.metadata["hcpc"].to_numpy() == -1
-                )  # interesting cells
-            else:
-                interesting_rows = []
-            if sum(interesting_rows) > 0:
-                # Split the metadata into interesting and regular
-                interesting_events = self.rows(interesting_rows)
-                interesting_df = pd.concat(
-                    [interesting_events.features, interesting_events.metadata], axis=1
-                )
-                data_events = self.rows(~interesting_rows)
-                data_df = pd.concat(
-                    [data_events.features, data_events.metadata], axis=1
-                )
-                data_df = data_df.drop(columns=["ocular_interesting"], errors="ignore")
-
-                # Drop particular columns for "interesting"
-                interesting_df = interesting_df.drop(
-                    [
-                        "clust",
-                        "hcpc",
-                        "frame_id",
-                        "cell_id",
-                        "unique_id",
-                        "ocular_interesting",
-                    ],
-                    axis=1,
-                    errors="ignore",
-                )
-                # Save both .csv and .rds
-                interesting_df.to_csv(
-                    os.path.join(output_path, "ocular_interesting.csv"), index=False
-                )
-                pyreadr.write_rds(
-                    os.path.join(output_path, "ocular_interesting.rds"), interesting_df
-                )
-            else:
-                data_df = pd.concat([self.features, self.metadata], axis=1)
-        else:
-            # Get all data and reset_index (will copy it)
-            data_df = pd.concat([self.features, self.metadata], axis=1)
-
-        # Split based on cluster number to conform to *-final[1-4].rds
-        n_clusters = max(data_df["clust"]) + 1
-        split_idx = [round(i * n_clusters / 4) for i in range(5)]
-        for i in range(4):
-            subset = (split_idx[i] <= data_df["clust"]) & (
-                data_df["clust"] < split_idx[i + 1]
-            )
-            data_df.loc[subset, "hcpc"] = i + 1
-            subset = data_df[subset].reset_index(drop=True)
-            pyreadr.write_rds(
-                os.path.join(output_path, f"{file_stub}{i+1}.rds"), subset
-            )
-
-        # Create new example cell strings
-        data_df["example_cell_id"] = (
-            data_df["slide_id"]
-            + " "
-            + data_df["frame_id"].astype(str)
-            + " "
-            + data_df["cell_id"].astype(str)
-            + " "
-            + data_df["cellx"].astype(int).astype(str)
-            + " "
-            + data_df["celly"].astype(int).astype(str)
-        )
-        # Find averagable data columns
-        if "cellcluster_id" in data_df.columns:
-            end_idx = data_df.columns.get_loc("cellcluster_id")
-        else:
-            end_idx = data_df.columns.get_loc("slide_id")
-        avg_cols = data_df.columns[:end_idx].tolist()
-        # Group by cluster and average
-        data_df = data_df.groupby("clust").agg(
-            **{col: (col, "mean") for col in avg_cols},
-            count=("clust", "size"),  # count rows in each cluster
-            example_cells=("example_cell_id", lambda x: ",".join(x)),
-            hcpc=("hcpc", lambda x: x.iloc[0]),
-        )
-        data_df = data_df.reset_index()  # Do NOT drop, index is "clust"
-        # Create new columns
-        metadata = pd.DataFrame(
-            {
-                "count": data_df["count"],
-                "example_cells": data_df["example_cells"],
-                "clust": data_df["clust"].astype(int),
-                "hcpc": data_df["hcpc"].astype(int),
-                "id": data_df["clust"].astype(int).astype(str),
-                "cccluster": "0",  # Dummy value
-                "ccdistance": 0.0,  # Dummy value
-                "rownum": list(range(len(data_df))),
-                "framegroup": 0,  # Dummy value
-            }
-        )
-        data_df = pd.concat([data_df[avg_cols], metadata], axis=1)
-        # Save the cluster data
-        data_df.to_csv(os.path.join(output_path, f"{file_stub}.csv"), index=False)
-        pyreadr.write_rds(os.path.join(output_path, f"{file_stub}.rds"), data_df)
