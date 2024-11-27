@@ -11,6 +11,9 @@ scikit-image
 opencv-python
 pyreadr
 pytest
+pytest-cov
+coverage
+genbadge[tests,coverage]
 hatchling
 build
 twine

@@ -53,7 +53,7 @@ build-backend = "hatchling.build"
 
 [tool.pytest.ini_options]
 minversion = "7.0"
-addopts = "-ra -q"
+addopts = "-ra -q --junitxml=junit.xml --cov=. --cov-config=.coveragerc --cov-report=xml"
 testpaths = [
     "tests",
 ]

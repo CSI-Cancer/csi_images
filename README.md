@@ -1,10 +1,11 @@
 # csi_images: image and data utilities for CSI-Cancer
 
 [![PyPI version](https://img.shields.io/pypi/v/csi-images)](https://pypi.org/project/csi-images/)
-[![Coverage Badge](docs/theme/coverage.svg)](https://csi-cancer.github.io/csi_images/coverage)
+![Coverage Badge](docs/coverage.svg)
+![Tests Badge](docs/tests.svg)
 
-This package is a library for interacting with data, mainly from immunoflourescent 
-microscopy, such as cells and the images thereof. 
+This package is a library for interacting with data, mainly from immunoflourescent
+microscopy, such as cells and the images thereof.
 While much of the functionality is specific to the CSI-Cancer organization, some of the
 functionality and structure may be beneficial for the broader community.
 Other packages in the CSI-Cancer organization may depend on this package.

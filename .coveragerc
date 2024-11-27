@@ -1,0 +1,14 @@
+[run]
+source =
+    csi_images
+    examples
+    tests
+omit =
+    config.py
+    config-3.py
+
+[html]
+directory = docs/coverage
+
+[xml]
+output = coverage.xml
