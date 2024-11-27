@@ -5,25 +5,40 @@ from skimage.measure import regionprops_table
 
 def extract_mask_info(
     mask: np.ndarray,
+    images: list[np.ndarray] = None,
+    image_labels: list[str] = None,
+    properties: list[str] = None,
 ) -> pd.DataFrame:
     """
-    Extracts events from a mask.
+    Extracts events from a mask. Originated from @vishnu
     :param mask: mask to extract events from
+    :param images: list of intensity images to extract from
+    :param image_labels: list of labels for images
+    :param properties: list of properties to extract in addition to the defaults:
+    label, centroid, axis_major_length. See
+    https://scikit-image.org/docs/stable/api/skimage.measure.html#skimage.measure.regionprops
+    for additional properties.
     :return: pd.DataFrame with columns: id, x, y, size, or an empty DataFrame
     """
+    # Return empty if the mask is empty
     if np.max(mask) == 0:
         return pd.DataFrame()
+    # Reshape any intensity images
+    if images is not None:
+        if isinstance(images, list):
+            images = np.stack(images, axis=-1)
+        if image_labels is not None and len(image_labels) != images.shape[-1]:
+            raise ValueError("Number of image labels must match number of images.")
+    # Accumulate any extra properties
+    base_properties = ["label", "centroid", "axis_major_length"]
+    if properties is not None:
+        properties = base_properties + properties
+    else:
+        properties = base_properties
 
     # Use skimage.measure.regionprops_table to compute properties
     info = pd.DataFrame(
-        regionprops_table(
-            mask,
-            properties=[
-                "label",
-                "centroid",
-                "axis_major_length",
-            ],
-        )
+        regionprops_table(mask, intensity_image=images, properties=properties)
     )
 
     # Rename columns to match desired output
@@ -35,6 +50,14 @@ def extract_mask_info(
             "axis_major_length": "size",
         },
     )
+    renamings = {}
+    for column in info.columns:
+        for i in range(len(image_labels)):
+            suffix = f"-{i}"
+            if column.endswith(suffix):
+                renamings[column] = f"{image_labels[i]}_{column[:-len(suffix)]}"
+    info = info.rename(columns=renamings)
+
     return info
 
 

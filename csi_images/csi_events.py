@@ -10,6 +10,7 @@ csi_utils.csi_scans documentation page for more information on the coordinate sy
 
 import os
 import math
+import warnings
 from typing import Self
 
 import numpy as np
@@ -18,9 +19,12 @@ import pandas as pd
 from .csi_scans import Scan
 from .csi_tiles import Tile
 from .csi_frames import Frame
-from .csi_images import extract_mask_info
 
 # Optional dependencies; will raise errors in particular functions if not installed
+try:
+    from .csi_images import extract_mask_info
+except ImportError:
+    extract_mask_info = None
 try:
     import pyreadr
 except ImportError:
@@ -77,9 +81,9 @@ class Event:
     ):
         self.scan = scan
         self.tile = tile
-        self.x = x
-        self.y = y
-        self.size = size
+        self.x = int(x)
+        self.y = int(y)
+        self.size = int(size)
         self.metadata = metadata
         self.features = features
 
@@ -208,7 +212,6 @@ class Event:
         Get the images for a list of events, ensuring that there is no wasteful reading
         of the same tile multiple times. This function is more efficient than calling
         extract_event_images for each event.
-        TODO: test this function
         :param events: the events to extract images for.
         :param crop_size: the square size of the image crop to get for this event.
                           Defaults to four times the size of the event.
@@ -263,16 +266,20 @@ class EventArray:
         features: pd.DataFrame = None,
     ):
         # Info must be a DataFrame with columns "slide_id", "tile", "roi", "x", "y", "size"
-        if info is not None and (
-            not all(
-                col in info.columns
-                for col in ["slide_id", "tile", "roi", "x", "y", "size"]
-            )
-            or len(info.columns) != 6
-        ):
-            raise ValueError(
-                "EventArray.info must have columns 'slide_id', 'tile', 'roi', 'x', 'y', 'size'"
-            )
+        if info is not None:
+            if list(info.columns) != self.INFO_COLUMNS:
+                raise ValueError(
+                    "EventArray.info must have columns 'slide_id', 'tile', 'roi', 'x', 'y', 'size'"
+                )
+            # Copy first to avoid modifying the original
+            info = info.copy()
+            # Ensure that the columns are the right types
+            info["slide_id"] = info["slide_id"].astype(str)
+            info["tile"] = info["tile"].astype(np.uint16)
+            info["roi"] = info["roi"].astype(np.uint8)
+            info["x"] = info["x"].round().astype(np.uint16)
+            info["y"] = info["y"].round().astype(np.uint16)
+            info["size"] = info["size"].round().astype(np.uint16)
         # All DataFrames must all have the same number of rows
         if metadata is not None and (info is None or len(info) != len(metadata)):
             raise ValueError(
@@ -480,20 +487,22 @@ class EventArray:
 
     def to_events(
         self,
-        scans: list[Scan],
+        scans: Scan | list[Scan],
         ignore_missing_scans=True,
         ignore_metadata=False,
         ignore_features=False,
     ) -> list[Event]:
         """
         Get the events in the EventArray as a list of events.
-        :param scans: the scans that the events belong to. Pass an empty list if you
-                      don't care about scan metadata.
+        :param scans: the scans that the events belong to, auto-matched by slide_id.
+        Pass None if you don't care about scan metadata (pass ignore_missing_scans).
         :param ignore_missing_scans: whether to create blank scans for events without scans.
         :param ignore_metadata: whether to ignore metadata or not
         :param ignore_features: whether to ignore features or not
         :return:
         """
+        if isinstance(scans, Scan):
+            scans = [scans] * len(self.info)
         events = []
         for i in range(len(self.info)):
             # Determine the associated scan
@@ -514,7 +523,24 @@ class EventArray:
                     raise ValueError(
                         f"Scan {self.info['slide_id'][i]} not found for event {i}."
                     )
-            # Add to the list
+            # Prepare the metadata and features
+            if ignore_metadata or self.metadata is None:
+                metadata = None
+            else:
+                # This Series creation method is less efficient,
+                # but required for preserving dtypes
+                metadata = pd.Series(
+                    {col: self.metadata.loc[i, col] for col in self.metadata.columns},
+                    dtype=object,
+                )
+            if ignore_features or self.features is None:
+                features = None
+            else:
+                features = pd.Series(
+                    {col: self.features.loc[i, col] for col in self.features.columns},
+                    dtype=object,
+                )
+            # Create the event and append it to the list
             events.append(
                 Event(
                     scan,
@@ -522,8 +548,8 @@ class EventArray:
                     self.info["x"][i],
                     self.info["y"][i],
                     size=self.info["size"][i],
-                    metadata=None if ignore_metadata else self.metadata.loc[i],
-                    features=None if ignore_features else self.features.loc[i],
+                    metadata=metadata,
+                    features=features,
                 )
             )
         return events
@@ -621,6 +647,9 @@ class EventArray:
         tile_n: int,
         n_roi: int = 0,
         include_cell_id: bool = True,
+        images: list[np.ndarray] = None,
+        image_labels: list[str] = None,
+        properties: list[str] = None,
     ) -> Self:
         """
         Extract events from a mask DataFrame, including metadata and features.
@@ -630,9 +659,23 @@ class EventArray:
         :param n_roi: the ROI number the mask is from.
         :param include_cell_id: whether to include the cell_id, or numerical
         mask label, as metadata in the EventArray.
+        :param images: the intensity images to extract features from.
+        :param image_labels: the labels for the intensity images.
+        :param properties: list of properties to extract in addition to the defaults:
         :return: EventArray corresponding to the mask labels.
         """
-        mask_info = extract_mask_info(mask)
+        if extract_mask_info is None:
+            raise ModuleNotFoundError(
+                "csi_images.csi_images dependencies not installed. Install csi-images "
+                "with [imageio] option to resolve."
+            )
+        # Gather mask_info
+        if images is not None and image_labels is not None:
+            if len(images) != len(image_labels):
+                raise ValueError("Intensity images and labels must match lengths.")
+
+        mask_info = extract_mask_info(mask, images, image_labels, properties)
+
         if len(mask_info) == 0:
             return EventArray()
 
@@ -652,8 +695,13 @@ class EventArray:
             metadata = pd.DataFrame({"cell_id": mask_info["id"]})
         else:
             metadata = None
-
-        return EventArray(info, metadata, None)
+        # If any additional properties were extracted, add them as features
+        mask_info = mask_info.drop(columns=["id", "x", "y", "size"], errors="ignore")
+        if len(mask_info.columns) > 0:
+            features = mask_info
+        else:
+            features = None
+        return EventArray(info, metadata, features)
 
     def save_csv(self, output_path: str) -> bool:
         """
@@ -717,6 +765,11 @@ class EventArray:
         :param event_type:
         :return:
         """
+        if pyreadr is None:
+            raise ModuleNotFoundError(
+                "pyreadr not installed. Install pyreadr directly "
+                "or install csi-images with [rds] option to resolve."
+            )
         if event_type == "cells":
             file_stub = "rc-final"
         elif event_type == "others":
@@ -724,16 +777,31 @@ class EventArray:
         else:
             raise ValueError("Invalid event type. Must be cells or others.")
 
+        # Ensure good metadata
+        metadata = pd.DataFrame(
+            {
+                "slide_id": self.info["slide_id"],
+                "frame_id": self.info["tile"],
+                "cell_id": (
+                    self.metadata["cell_id"]
+                    if "cell_id" in self.metadata.columns
+                    else range(len(self.info))
+                ),
+                "cellx": self.info["x"],
+                "celly": self.info["y"],
+            }
+        )
+        if self.metadata is not None:
+            metadata[self.metadata.columns] = self.metadata.copy()
+
         # Check for the "ocular_interesting" column
         if event_type == "cells":
-            if "ocular_interesting" in self.metadata.columns:
-                interesting_rows = self.metadata["ocular_interesting"].to_numpy(
-                    dtype=bool
-                )
-            elif "hcpc" in self.metadata.columns:
+            if "ocular_interesting" in metadata.columns:
+                interesting_rows = metadata["ocular_interesting"].to_numpy(dtype=bool)
+            elif "hcpc" in metadata.columns:
                 # Interesting cells don't get an hcpc designation, leaving them as -1
                 interesting_rows = (
-                    self.metadata["hcpc"].to_numpy() == -1
+                    metadata["hcpc"].to_numpy() == -1
                 )  # interesting cells
             else:
                 interesting_rows = []
@@ -763,17 +831,17 @@ class EventArray:
                     errors="ignore",
                 )
                 # Save both .csv and .rds
-                interesting_df.to_csv(
-                    os.path.join(output_path, "ocular_interesting.csv"), index=False
-                )
-                pyreadr.write_rds(
-                    os.path.join(output_path, "ocular_interesting.rds"), interesting_df
-                )
+                interesting_stub = os.path.join(output_path, "ocular_interesting")
+                interesting_df.to_csv(f"{interesting_stub}.csv")
+                # Suppress pandas FutureWarning
+                with warnings.catch_warnings():
+                    warnings.simplefilter(action="ignore", category=FutureWarning)
+                    pyreadr.write_rds(f"{interesting_stub}.rds", interesting_df)
             else:
-                data_df = pd.concat([self.features, self.metadata], axis=1)
+                data_df = pd.concat([self.features, metadata], axis=1)
         else:
             # Get all data and reset_index (will copy it)
-            data_df = pd.concat([self.features, self.metadata], axis=1)
+            data_df = pd.concat([self.features, metadata], axis=1)
 
         # Split based on cluster number to conform to *-final[1-4].rds
         n_clusters = max(data_df["clust"]) + 1
@@ -784,9 +852,12 @@ class EventArray:
             )
             data_df.loc[subset, "hcpc"] = i + 1
             subset = data_df[subset].reset_index(drop=True)
-            pyreadr.write_rds(
-                os.path.join(output_path, f"{file_stub}{i+1}.rds"), subset
-            )
+            # Suppress pandas FutureWarning
+            with warnings.catch_warnings():
+                warnings.simplefilter(action="ignore", category=FutureWarning)
+                pyreadr.write_rds(
+                    os.path.join(output_path, f"{file_stub}{i+1}.rds"), subset
+                )
 
         # Create new example cell strings
         data_df["example_cell_id"] = (
@@ -828,10 +899,23 @@ class EventArray:
                 "framegroup": 0,  # Dummy value
             }
         )
-        data_df = pd.concat([data_df[avg_cols], metadata], axis=1)
+        # Need to pad the features to 761 columns, as per OCULAR report needs
+        additional_columns = range(len(avg_cols), 761)
+        if len(additional_columns) > 0:
+            padding = pd.DataFrame(
+                np.zeros((len(data_df), len(additional_columns))),
+                columns=[f"pad{i}" for i in additional_columns],
+            )
+            data_df = pd.concat([data_df[avg_cols], padding, metadata], axis=1)
+        else:
+            data_df = pd.concat([data_df[avg_cols], metadata], axis=1)
+
         # Save the cluster data
-        data_df.to_csv(os.path.join(output_path, f"{file_stub}.csv"), index=False)
-        pyreadr.write_rds(os.path.join(output_path, f"{file_stub}.rds"), data_df)
+        data_df.to_csv(os.path.join(output_path, f"{file_stub}.csv"))
+        # Suppress pandas FutureWarning
+        with warnings.catch_warnings():
+            warnings.simplefilter(action="ignore", category=FutureWarning)
+            pyreadr.write_rds(os.path.join(output_path, f"{file_stub}.rds"), data_df)
 
     @classmethod
     def load_ocular(
@@ -907,7 +991,11 @@ class EventArray:
                 log.debug(f"{file} has {len(file_data[file])} cells")
 
             # Drop common cells if requested and in this file
-            if file in atlas_data_files and drop_common_events:
+            if (
+                file in atlas_data_files
+                and drop_common_events
+                and "catalogue_classification" in file_data[file]
+            ):
                 common_cell_indices = (
                     file_data[file]["catalogue_classification"] == "common_cell"
                 )
@@ -927,7 +1015,7 @@ class EventArray:
 
             # Extract frame_id and cell_id
             # DAPI- events already have frame_id cell_id outside rowname
-            if event_type == "cells":
+            if event_type == "cells" and "frame_id" not in file_data[file].columns:
                 file_data[file]["rowname"] = file_data[file]["rowname"].astype("str")
                 # get frame_id cell_id from rownames column and split into two columns
                 split_res = file_data[file]["rowname"].str.split(" ", n=1, expand=True)

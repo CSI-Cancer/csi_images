@@ -13,9 +13,12 @@ import numpy as np
 
 from .csi_scans import Scan
 from .csi_tiles import Tile
-from . import csi_images
 
 # Optional dependencies; will raise errors in particular functions if not installed
+try:
+    from . import csi_images
+except ImportError:
+    csi_images = None
 try:
     import tifffile
 except ImportError:
@@ -238,6 +241,11 @@ class Frame:
         :param input_path: the path to the input images. Will use metadata if not provided.
         :return: the image as a numpy array.
         """
+        if csi_images is None:
+            raise ModuleNotFoundError(
+                "csi-images library not installed. "
+                "Install csi-images with [imageio] option to resolve."
+            )
         images = []
         colors = []
         for channel_index, color in channels.items():
