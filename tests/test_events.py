@@ -8,6 +8,7 @@ import pandas as pd
 from csi_images.csi_scans import Scan
 from csi_images.csi_tiles import Tile
 from csi_images.csi_events import Event, EventArray
+from csi_images import csi_images
 
 if os.environ.get("DEBIAN_FRONTEND") == "noninteractive":
     SHOW_PLOTS = False
@@ -25,11 +26,12 @@ def test_getting_event():
         515,
         411,
     )
+    # Test getting images
     images = event.extract_images()
     assert len(images) == 4
-    images = event.extract_images(crop_size=100, in_pixels=True)
+    images = event.extract_images(crop_size=100)
     assert images[0].shape == (100, 100)
-    images = event.extract_images(crop_size=50, in_pixels=True)
+    images = event.extract_images(crop_size=50)
     assert images[0].shape == (50, 50)
 
     if SHOW_PLOTS:
@@ -47,9 +49,9 @@ def test_getting_event():
     )
     images = event.extract_images()
     assert len(images) == 4
-    images = event.extract_images(crop_size=100, in_pixels=True)
+    images = event.extract_images(crop_size=100)
     assert images[0].shape == (100, 100)
-    images = event.extract_images(crop_size=200, in_pixels=True)
+    images = event.extract_images(crop_size=200)
     assert images[0].shape == (200, 200)
 
     if SHOW_PLOTS:
@@ -302,3 +304,58 @@ def test_copy_sort_rows_get():
     assert len(events_get) == 3
     assert events_get.info["x"].equals(pd.Series([2000, 0, 0], dtype=np.uint16))
     assert events_get.info["y"].equals(pd.Series([2000, 0, 100], dtype=np.uint16))
+
+
+def test_event_montages():
+    scan = Scan.load_txt("tests/data")
+    tile = Tile(scan, 1000)
+    event = Event(scan, tile, 515, 411)
+    images = event.extract_images(crop_size=100)
+
+    # Test different montages
+    montage = csi_images.make_montage(images, [0, 1, 2, 3])
+    montage_shape = csi_images.get_montage_size(images[0].shape, 4)
+    assert montage.shape == montage_shape
+
+    if SHOW_PLOTS:
+        cv2.imshow("Horizontal montage with all channels", montage)
+        cv2.waitKey(0)
+        cv2.destroyAllWindows()
+
+    montage = csi_images.make_montage(images, [0, 2])
+    if SHOW_PLOTS:
+        cv2.imshow("Horizontal montage with DAPI, CD45", montage)
+        cv2.waitKey(0)
+        cv2.destroyAllWindows()
+
+    montage = csi_images.make_montage(images, [0, 2], horizontal=False)
+    if SHOW_PLOTS:
+        cv2.imshow("Vertical montage with DAPI, CD45", montage)
+        cv2.waitKey(0)
+        cv2.destroyAllWindows()
+
+    montage = csi_images.make_montage(
+        images,
+        [0, 2],
+        {0: (0, 0, 1), 2: (0, 1, 0)},
+    )
+    if SHOW_PLOTS:
+        cv2.imshow(
+            "Horizontal montage with DAPI+CD45, DAPI, CD45",
+            cv2.cvtColor(montage, cv2.COLOR_RGB2BGR),
+        )
+        cv2.waitKey(0)
+        cv2.destroyAllWindows()
+
+    montage = csi_images.make_montage(
+        images,
+        [0, 1, 2, 3],
+        {0: (0, 0, 1), 1: (1, 0, 0), 2: (0, 1, 0), 3: (1, 1, 1)},
+    )
+    if SHOW_PLOTS:
+        cv2.imshow(
+            "Full, classic montage",
+            cv2.cvtColor(montage, cv2.COLOR_RGB2BGR),
+        )
+        cv2.waitKey(0)
+        cv2.destroyAllWindows()

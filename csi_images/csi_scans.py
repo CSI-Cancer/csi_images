@@ -127,13 +127,14 @@ class Scan(yaml.YAMLObject):
     def __init__(
         self,
         slide_id: str = "",
+        exists: bool = True,
         path: str = "",
         start_date: str = "",
         end_date: str = "",
         scan_time_s: int = -1,
         scanner_id: str = "",
-        tray: int = -1,
-        slot: int = -1,
+        tray_pos: int = -1,
+        slide_pos: int = -1,
         camera: str = "",
         objective: str = "",
         pixel_size_um: float = -1.0,
@@ -148,13 +149,14 @@ class Scan(yaml.YAMLObject):
         if channels is None:
             channels = []
         self.slide_id = slide_id
+        self.exists = exists
         self.path = path
         self.start_date = start_date
         self.end_date = end_date
         self.scan_time_s = scan_time_s
         self.scanner_id = scanner_id
-        self.tray = tray
-        self.slot = slot
+        self.tray_pos = tray_pos
+        self.slide_pos = slide_pos
         self.camera = camera
         self.objective = objective
         self.pixel_size_um = pixel_size_um
@@ -274,8 +276,8 @@ class Scan(yaml.YAMLObject):
             "end_date": self.end_date,
             "scan_time_s": self.scan_time_s,
             "scanner_id": self.scanner_id,
-            "tray": self.tray,
-            "slot": self.slot,
+            "tray_pos": self.tray_pos,
+            "slide_pos": self.slide_pos,
             "camera": self.camera,
             "objective": self.objective,
             "pixel_size_um": self.pixel_size_um,
@@ -297,8 +299,8 @@ class Scan(yaml.YAMLObject):
             end_date=scan_dict["end_datetime"].astimezone(local_timezone),
             scan_time_s=int(dt),
             scanner_id=scan_dict["scanner_id"],
-            tray=scan_dict["tray"],
-            slot=scan_dict["slot"],
+            tray_pos=scan_dict["tray_pos"],
+            slide_pos=scan_dict["slide_pos"],
             camera=scan_dict["camera"],
             objective=scan_dict["objective"],
             pixel_size_um=scan_dict["pixel_size"],
@@ -377,8 +379,8 @@ class Scan(yaml.YAMLObject):
             cls.DATETIME_FORMAT[cls.Type.AXIOSCAN7]
         )
 
-        scan.tray = int(metadata_xml.find(".//SlotNumberOfLoadedTray").text)
-        scan.slot = int(metadata_xml.find(".//SlideScannerPosition").text[-1])
+        scan.tray_pos = int(metadata_xml.find(".//SlotNumberOfLoadedTray").text)
+        scan.slide_pos = int(metadata_xml.find(".//SlideScannerPosition").text[-1])
 
         # Get camera and magnifying info
         scan.camera = (
@@ -583,8 +585,8 @@ class Scan(yaml.YAMLObject):
 
         # Map the raw scanner ID (service ID) to our IDs
         scan.scanner_id = f'{cls.Type.BZSCANNER.value}_{metadata_dict["INSTRUMENT"]}'
-        scan.tray = 0  # only one tray in a BZScanner
-        scan.slot = int(metadata_dict["SLIDEPOS"]) - 1  # 1-indexed
+        scan.tray_pos = 0  # only one tray_pos in a BZScanner
+        scan.slide_pos = int(metadata_dict["SLIDEPOS"]) - 1  # 1-indexed
 
         # Get camera and magnifying info
         scan.camera = ""
@@ -674,7 +676,11 @@ class Scan(yaml.YAMLObject):
 
     @classmethod
     def make_placeholder(
-        cls, slide_id: str, n_tile: int = 2304, n_roi: int = 0
+        cls,
+        slide_id: str,
+        n_tile: int = 2303,
+        n_roi: int = 0,
+        scanner_type: Type = Type.BZSCANNER,
     ) -> typing.Self:
         """
         Make a placeholder Scan object with only basic required information filled in.
@@ -691,6 +697,11 @@ class Scan(yaml.YAMLObject):
         # Generate the object
         scan = cls()
         scan.slide_id = slide_id
-        scan.roi = [cls.ROI() for _ in range(n_roi)]
-        scan.roi[0].tile_cols = n_tile
+        if scanner_type == cls.Type.AXIOSCAN7:
+            scan.scanner_id = f"{cls.Type.AXIOSCAN7.value}_placeholder"
+        elif scanner_type == cls.Type.BZSCANNER:
+            scan.scanner_id = f"{cls.Type.BZSCANNER.value}_placeholder"
+        scan.roi = [cls.ROI() for _ in range(n_roi + 1)]
+        scan.roi[0].tile_rows = 1
+        scan.roi[0].tile_cols = n_tile + 1
         return scan

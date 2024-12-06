@@ -289,6 +289,19 @@ class EventArray:
             raise ValueError(
                 "If EventArray.features is not None, it should match rows with .info"
             )
+        # No columns named "metadata_", "features_", or "None"
+        column_names = []
+        if metadata is not None:
+            column_names += metadata.columns.tolist()
+        if features is not None:
+            column_names += features.columns.tolist()
+        if any([col.lower().startswith("metadata_") for col in column_names]):
+            raise ValueError("EventArray column names cannot start with 'metadata_'")
+        if any([col.lower().startswith("features_") for col in column_names]):
+            raise ValueError("EventArray column names cannot start with 'features_'")
+        if any([col.lower() == "none" for col in column_names]):
+            raise ValueError("EventArray column names cannot be 'none'")
+
         self.info = info
         self.metadata = metadata
         self.features = features
@@ -502,20 +515,17 @@ class EventArray:
         :return:
         """
         if isinstance(scans, Scan):
-            scans = [scans] * len(self.info)
+            scans = [scans]
+        scans = {scan.slide_id: scan for scan in scans}
         events = []
         for i in range(len(self.info)):
             # Determine the associated scan
-            scan = None
-            for s in scans:
-                if s.slide_id == self.info["slide_id"][i]:
-                    scan = s
-                    break
-            if scan is None:
+            slide_id = self.info["slide_id"][i]
+            if slide_id not in scans:
                 if ignore_missing_scans:
                     # Create a placeholder scan if the scan is missing
                     scan = Scan.make_placeholder(
-                        self.info["slide_id"][i],
+                        slide_id,
                         self.info["tile"][i],
                         self.info["roi"][i],
                     )
@@ -523,6 +533,9 @@ class EventArray:
                     raise ValueError(
                         f"Scan {self.info['slide_id'][i]} not found for event {i}."
                     )
+            else:
+                scan = scans[slide_id]
+
             # Prepare the metadata and features
             if ignore_metadata or self.metadata is None:
                 metadata = None
@@ -750,7 +763,7 @@ class EventArray:
         :return:
         """
         # Open the input_path as an HDF5 file
-        with pd.HDFStore(input_path) as store:
+        with pd.HDFStore(input_path, "r") as store:
             # Load the dataframes from the HDF5 file
             info = store.get("info") if "info" in store else None
             metadata = store.get("metadata") if "metadata" in store else None
