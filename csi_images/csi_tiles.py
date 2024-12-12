@@ -4,7 +4,7 @@ in a scan. The module comes with several helper functions that allow for gatheri
 based on their position in the scan.
 """
 
-import typing
+from typing import Self, Iterable
 
 import numpy as np
 
@@ -119,10 +119,10 @@ class Tile:
     def get_tiles(
         cls,
         scan: Scan,
-        coordinates: list[int] | list[tuple[int, int]] = None,
+        coordinates: Iterable[int] | Iterable[tuple[int, int]] = None,
         n_roi: int = 0,
         as_flat: bool = True,
-    ) -> list[typing.Self] | list[list[typing.Self]]:
+    ) -> list[Self] | list[list[Self]]:
         """
         The simplest way to gather a list of Tile objects. By default, it will gather all
         tiles in the scan. To gather specific tiles, provide a list of coordinates.
@@ -180,11 +180,11 @@ class Tile:
     def get_tiles_by_row_col(
         cls,
         scan: Scan,
-        rows: list[int] = None,
-        cols: list[int] = None,
+        rows: Iterable[int] = None,
+        cols: Iterable[int] = None,
         n_roi: int = 0,
         as_flat: bool = True,
-    ) -> list[typing.Self] | list[list[typing.Self]]:
+    ) -> list[Self] | list[list[Self]]:
         """
         Gather a list of Tile objects based on the row and column indices provided.
         If left as None, it will gather all rows and/or columns.
@@ -199,9 +199,9 @@ class Tile:
                  if not as_flat: a list of lists of Tile objects in their relative coordinates
         """
         if rows is None:
-            rows = list(range(scan.roi[n_roi].tile_rows))
+            rows = range(scan.roi[n_roi].tile_rows)
         if cols is None:
-            cols = list(range(scan.roi[n_roi].tile_cols))
+            cols = range(scan.roi[n_roi].tile_cols)
 
         # Populate coordinates
         coordinates = []
@@ -218,7 +218,7 @@ class Tile:
         bounds: tuple[int, int, int, int],
         n_roi: int = 0,
         as_flat: bool = True,
-    ) -> list[typing.Self] | list[list[typing.Self]]:
+    ) -> list[Self] | list[list[Self]]:
         """
         Gather a list of Tile objects based on the x, y bounds provided. The bounds are
         exclusive, like indices, so the tiles at the corners are NOT included in the list.

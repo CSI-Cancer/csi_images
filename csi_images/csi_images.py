@@ -30,7 +30,7 @@ def extract_mask_info(
         if image_labels is not None and len(image_labels) != images.shape[-1]:
             raise ValueError("Number of image labels must match number of images.")
     # Accumulate any extra properties
-    base_properties = ["label", "centroid", "axis_major_length"]
+    base_properties = ["label", "centroid"]
     if properties is not None:
         properties = base_properties + properties
     else:
@@ -47,7 +47,6 @@ def extract_mask_info(
             "label": "id",
             "centroid-0": "y",
             "centroid-1": "x",
-            "axis_major_length": "size",
         },
     )
     renamings = {}
@@ -107,7 +106,7 @@ def make_montage(
     images: list[np.ndarray],
     order: list[int] = None,
     composites: dict[int, tuple[float, float, float]] = None,
-    border_size: int = 2,
+    border_size: int = 1,
     horizontal: bool = True,
     dtype=np.uint8,
 ) -> np.ndarray:
@@ -136,8 +135,9 @@ def make_montage(
     # Populate the montage with black
     n_images = len(order) if order is not None else 0
     n_images += 1 if composites is not None else 0
-    montage = np.zeros(
-        get_montage_size(images[0].shape, n_images, border_size, horizontal),
+    montage = np.full(
+        get_montage_shape(images[0].shape, n_images, border_size, horizontal),
+        np.iinfo(dtype).max,  # White fill
         dtype=dtype,
     )
 
@@ -186,10 +186,10 @@ def make_montage(
     return montage
 
 
-def get_montage_size(
+def get_montage_shape(
     image_shape: tuple[int, int],
     n_images: int,
-    border_size: int = 2,
+    border_size: int = 1,
     horizontal: bool = True,
 ) -> tuple[int, int, int]:
     """

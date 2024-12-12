@@ -8,7 +8,7 @@ import os
 import enum
 import datetime
 import zoneinfo
-import typing
+from typing import Self, Iterable, Any
 
 import yaml
 import json
@@ -24,7 +24,7 @@ class Scan(yaml.YAMLObject):
     Class that composes a whole scan's metadata. Contains some universal data,
     plus lists for channels and ROIs.
 
-    .. include:: ../docs/csi_images/coordinate_systems.md
+    .. include:: ../docs/coordinate_systems.md
     """
 
     yaml_tag = "csi_utils.scans.Scan"
@@ -70,10 +70,12 @@ class Scan(yaml.YAMLObject):
             name: str = "",
             exposure_ms: float = -1.0,
             intensity: float = -1.0,
+            gain_applied: bool = False,
         ):
             self.name = name
             self.exposure_ms = exposure_ms
             self.intensity = intensity
+            self.gain_applied = gain_applied
 
         def __repr__(self):
             return yaml.dump(self, sort_keys=False)
@@ -141,8 +143,8 @@ class Scan(yaml.YAMLObject):
         tile_width_px: int = -1,
         tile_height_px: int = -1,
         tile_overlap_proportion: int = -1,
-        channels=None,
-        roi=None,
+        channels: list[Channel] = None,
+        roi: list[ROI] = None,
     ):
         if roi is None:
             roi = []
@@ -191,7 +193,7 @@ class Scan(yaml.YAMLObject):
         """
         return [channel.name for channel in self.channels]
 
-    def get_channel_indices(self, channel_names: list[str | None]) -> list[int]:
+    def get_channel_indices(self, channel_names: Iterable[str | None]) -> list[int]:
         """
         Given a list of channel names, return the corresponding indices in the scan's
         channel order. Will convert BZScanner channel names (TRITC, CY5, FITC) to the
@@ -242,7 +244,7 @@ class Scan(yaml.YAMLObject):
             yaml.dump(self, stream=file, sort_keys=False)
 
     @classmethod
-    def load_yaml(cls, input_path: str) -> typing.Self:
+    def load_yaml(cls, input_path: str) -> Self:
         """
         Load a Scan object from a .yaml file.
         :param input_path: /path/to/file.yaml or /path/to/folder with scan.yaml
@@ -271,6 +273,7 @@ class Scan(yaml.YAMLObject):
 
         return {
             "slide_id": self.slide_id,
+            "exists": self.exists,
             "path": self.path,
             "start_date": self.start_date,
             "end_date": self.end_date,
@@ -289,11 +292,12 @@ class Scan(yaml.YAMLObject):
         }
 
     @classmethod
-    def from_dict(cls, scan_dict) -> typing.Self:
+    def from_dict(cls, scan_dict) -> Self:
         local_timezone = zoneinfo.ZoneInfo("localtime")
         dt = (scan_dict["end_datetime"] - scan_dict["start_datetime"]).total_seconds()
         result = cls(
             slide_id=scan_dict["slide_id"],
+            exists=scan_dict["exists"],
             path=scan_dict["path"],
             start_date=scan_dict["start_datetime"].astimezone(local_timezone),
             end_date=scan_dict["end_datetime"].astimezone(local_timezone),
@@ -314,6 +318,7 @@ class Scan(yaml.YAMLObject):
                     name=channel_json["name"],
                     exposure_ms=channel_json["exposure_ms"],
                     intensity=channel_json["intensity"],
+                    gain_applied=channel_json["gain_applied"],
                 )
             )
         for roi_json in scan_dict["roi"]["data"]:
@@ -331,7 +336,7 @@ class Scan(yaml.YAMLObject):
         return result
 
     @classmethod
-    def load_czi(cls, input_path: str) -> typing.Self:
+    def load_czi(cls, input_path: str) -> Self:
         """
         :param input_path: the path to the .czi file
         :return: a Scan object
@@ -422,6 +427,7 @@ class Scan(yaml.YAMLObject):
                     name=channel.attrib["Name"].upper(),
                     exposure_ms=float(channel.find("./ExposureTime").text) * 1e-6,
                     intensity=intensity,
+                    gain_applied=True,  # In Axioscan, we will always use gain = 1
                 )
             )
         # Make sure the channels are sorted
@@ -535,7 +541,7 @@ class Scan(yaml.YAMLObject):
         return scan
 
     @classmethod
-    def load_txt(cls, input_path: str) -> typing.Self:
+    def load_txt(cls, input_path: str) -> Self:
         """
         Loads a Scan object from a .txt file, which originates from the BZScanner.
         Some metadata from the slideinfo.txt file is missing or adjusted to fit.
@@ -601,6 +607,10 @@ class Scan(yaml.YAMLObject):
         scan.tile_overlap_proportion = 0
 
         # Extract channels and create Channel objects from them
+        if "gain_applied" in metadata_dict:
+            gain_applied = True if metadata_dict["gain_applied"] == "1" else False
+        else:
+            gain_applied = True  # Previous policy was always to apply gains
         for channel in list(cls.BZSCANNER_CHANNEL_MAP.keys()):
             channel_settings = metadata_dict[channel].split(",")
             if channel_settings[0] == "0":
@@ -610,6 +620,7 @@ class Scan(yaml.YAMLObject):
                     name=cls.BZSCANNER_CHANNEL_MAP[channel],
                     exposure_ms=float(channel_settings[1]),
                     intensity=float(channel_settings[2]),
+                    gain_applied=gain_applied,
                 )
             )
 
@@ -649,7 +660,7 @@ class Scan(yaml.YAMLObject):
         return scan
 
     @classmethod
-    def load_from_folder(cls, input_path: str) -> typing.Self:
+    def load_from_folder(cls, input_path: str) -> Self:
         """
         Load a Scan object from a folder that contains scan.yaml or slideinfo.txt.
         Prefers scan.yaml if both exist.
@@ -681,7 +692,7 @@ class Scan(yaml.YAMLObject):
         n_tile: int = 2303,
         n_roi: int = 0,
         scanner_type: Type = Type.BZSCANNER,
-    ) -> typing.Self:
+    ) -> Self:
         """
         Make a placeholder Scan object with only basic required information filled in.
         :param slide_id: the slide ID

@@ -6,8 +6,7 @@ composite images from a tile and a set of channels.
 """
 
 import os
-import typing
-import warnings
+from typing import Self, Iterable
 
 import numpy as np
 
@@ -36,7 +35,9 @@ class Frame:
                     f"Channel index {self.channel} is out of bounds for scan."
                 )
         elif isinstance(channel, str):
-            self.channel = self.scan.get_channel_indices([channel])
+            self.channel = self.scan.get_channel_indices([channel])[0]
+        else:
+            raise ValueError("Channel must be an integer or a string.")
 
     def __repr__(self) -> str:
         return f"{self.scan.slide_id}-{self.tile.n}-{self.scan.channels[self.channel].name}"
@@ -96,13 +97,15 @@ class Frame:
             raise ValueError(f"Scanner {self.scan.scanner_id} not supported.")
         return file_name
 
-    def get_image(self, input_path: str = None) -> np.ndarray:
+    def get_image(self, input_path: str = None, apply_gain: bool = True) -> np.ndarray:
         """
         Loads the image for this frame. Handles .tif (will return 16-bit images) and
         .jpg/.jpeg (will return 8-bit images), based on the CSI convention for storing
         .jpg/.jpeg images (compressed, using .tags files).
         :param input_path: the path to the scan's directory. If None, defaults to
                            the path loaded in the frame's tile's scan object.
+        :param apply_gain: whether to apply the gain to the image. Only has an effect
+                           if the scanner calculated but did not apply gain. Defaults to True.
         :return: the array representing the image.
         """
         if tifffile is None:
@@ -112,6 +115,8 @@ class Frame:
             )
 
         file_path = self.get_file_path(input_path)
+
+        image = None
 
         # Check for the file
         if not os.path.exists(file_path):
@@ -124,15 +129,17 @@ class Frame:
                 file_path = jpeg_path
             # If we've found a .jpg/.jpeg, try loading it as compressed
             if file_path == jpeg_path:
-                return self._get_jpeg_image(file_path)
+                image = self._get_jpeg_image(file_path)
             else:
                 raise FileNotFoundError(f"Could not find image at {file_path}")
         else:
             # Load the image
             image = tifffile.imread(file_path)
-            if image is None or image.size == 0:
-                raise ValueError(f"Could not load image from {file_path}")
-            return image
+        if image is None or image.size == 0:
+            raise ValueError(f"Could not load image from {file_path}")
+        if apply_gain and not self.scan.channels[self.channel].gain_applied:
+            image = image * self.scan.channels[self.channel].intensity
+        return image
 
     def _get_jpeg_image(self, input_path: str) -> np.ndarray:
         raise NotImplementedError("JPEG image loading not yet implemented.")
@@ -181,8 +188,10 @@ class Frame:
 
     @classmethod
     def get_frames(
-        cls, tile: Tile, channels: tuple[int | str] = None
-    ) -> list[typing.Self]:
+        cls,
+        tile: Tile,
+        channels: Iterable[int | str] = None,
+    ) -> list[Self]:
         """
         Get the frames for a tile and a set of channels. By default, gets all channels.
         :param tile: the tile.
@@ -191,6 +200,7 @@ class Frame:
         """
         if channels is None:
             channels = range(len(tile.scan.channels))
+
         frames = []
         for channel in channels:
             frames.append(Frame(tile.scan, tile, channel))
@@ -200,10 +210,10 @@ class Frame:
     def get_all_frames(
         cls,
         scan: Scan,
-        channels: tuple[int | str] = None,
+        channels: Iterable[int | str] = None,
         n_roi: int = 0,
         as_flat: bool = True,
-    ) -> list[list[typing.Self]] | list[list[list[typing.Self]]]:
+    ) -> list[list[Self]] | list[list[list[Self]]]:
         """
         Get all frames for a scan and a set of channels.
         :param scan: the scan metadata.

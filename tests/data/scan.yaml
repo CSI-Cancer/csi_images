@@ -1,5 +1,6 @@
 !<csi_utils.scans.Scan>
 slide_id: DUMMY_SLIDE_ID_FOR_TESTING
+exists: true
 path: /mnt/HDSCA_Development/data/0B68818
 start_date: 2024-02-12T18:17:43-0800
 end_date: 2024-02-12T18:41:16-0800
@@ -18,18 +19,22 @@ channels:
     name: DAPI
     exposure_ms: 15.0
     intensity: 0.5
+    gain_applied: true
   - !<csi_utils.csi_scans.Scan.Channel>
     name: AF488
     exposure_ms: 150.0
     intensity: 1.0
+    gain_applied: true
   - !<csi_utils.csi_scans.Scan.Channel>
     name: AF555
     exposure_ms: 140.0
     intensity: 1.0
+    gain_applied: true
   - !<csi_utils.csi_scans.Scan.Channel>
     name: AF647
     exposure_ms: 300.0
     intensity: 1.0
+    gain_applied: true
 roi:
   - !<csi_utils.csi_scans.Scan.ROI>
     origin_x_um: -59000

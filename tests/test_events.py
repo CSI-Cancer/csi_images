@@ -19,12 +19,12 @@ else:
 
 def test_getting_event():
     scan = Scan.load_txt("tests/data")
-    tile = Tile(scan, 1000)
+    tile = Tile(scan, 0)
     event = Event(
         scan,
         tile,
-        515,
-        411,
+        516,
+        278,
     )
     # Test getting images
     images = event.extract_images()
@@ -44,8 +44,8 @@ def test_getting_event():
     event = Event(
         scan,
         tile,
-        2,
-        1000,
+        1346,
+        9,
     )
     images = event.extract_images()
     assert len(images) == 4
@@ -56,7 +56,7 @@ def test_getting_event():
 
     if SHOW_PLOTS:
         for image in images:
-            cv2.imshow("Events in the corner of a tile", image)
+            cv2.imshow("Events in the top-right corner of a tile", image)
             cv2.waitKey(0)
         cv2.destroyAllWindows()
 
@@ -314,7 +314,7 @@ def test_event_montages():
 
     # Test different montages
     montage = csi_images.make_montage(images, [0, 1, 2, 3])
-    montage_shape = csi_images.get_montage_size(images[0].shape, 4)
+    montage_shape = csi_images.get_montage_shape(images[0].shape, 4)
     assert montage.shape == montage_shape
 
     if SHOW_PLOTS:

@@ -11,7 +11,7 @@ csi_utils.csi_scans documentation page for more information on the coordinate sy
 import os
 import math
 import warnings
-from typing import Self
+from typing import Self, Iterable, Hashable, Sequence
 
 import numpy as np
 import pandas as pd
@@ -75,7 +75,6 @@ class Event:
         tile: Tile,
         x: int,
         y: int,
-        size: int = 12,  # End-to-end size in pixels
         metadata: pd.Series = None,
         features: pd.Series = None,
     ):
@@ -83,7 +82,6 @@ class Event:
         self.tile = tile
         self.x = int(x)
         self.y = int(y)
-        self.size = int(size)
         self.metadata = metadata
         self.features = features
 
@@ -132,7 +130,7 @@ class Event:
         return float(slide_position[0][0]), float(slide_position[1][0])
 
     def crop_images(
-        self, images: list[np.ndarray], crop_size: int = 100, in_pixels: bool = True
+        self, images: Iterable[np.ndarray], crop_size: int = 100, in_pixels: bool = True
     ) -> list[np.ndarray]:
         """
         Get the event crops from the frame images. Called "get" because it does not
@@ -150,10 +148,10 @@ class Event:
             crop_size = round(crop_size / self.scan.pixel_size_um)
         # Find the crop bounds
         bounds = [
-            self.x - crop_size // 2,
-            self.y - crop_size // 2,
-            self.x + math.ceil(crop_size / 2),
-            self.y + math.ceil(crop_size / 2),
+            self.x - (crop_size // 2) + 1,
+            self.y - (crop_size // 2) + 1,
+            self.x + math.ceil(crop_size / 2) + 1,
+            self.y + math.ceil(crop_size / 2) + 1,
         ]
         # Determine how much the bounds violate the image size
         displacements = [
@@ -171,22 +169,27 @@ class Event:
         ]
 
         # Crop the images
-        cropped_images = []
+        crops = []
         for image in images:
             # Create a blank image of the right size
-            cropped_image = np.zeros((crop_size, crop_size), dtype=image.dtype)
+            crop = np.zeros((crop_size, crop_size), dtype=image.dtype)
 
             # Insert the cropped image into the blank image, leaving a black buffer
             # around the edges if the crop would go beyond the original image bounds
-            cropped_image[
+            crop[
                 displacements[1] : crop_size - displacements[3],
                 displacements[0] : crop_size - displacements[2],
             ] = image[bounds[1] : bounds[3], bounds[0] : bounds[2]]
-            cropped_images.append(cropped_image)
-        return cropped_images
+            crops.append(crop)
+        return crops
 
     def extract_images(
-        self, crop_size: int = 100, in_pixels: bool = True
+        self,
+        crop_size: int = 100,
+        in_pixels: bool = True,
+        input_path: str = None,
+        channels: Iterable[int | str] = None,
+        apply_gain: bool | Iterable[bool] = True,
     ) -> list[np.ndarray]:
         """
         Extract the images from the scan and tile, reading from the file. Called
@@ -195,18 +198,27 @@ class Event:
         reading multiple events from the same tile.
         :param crop_size: the square size of the image crop to get for this event.
         :param in_pixels: whether the crop size is in pixels or micrometers. Defaults to pixels.
+        :param input_path: the path to the input images. Defaults to None (uses the scan's path).
+        :param channels: the channels to extract images for. Defaults to all channels.
+        :param apply_gain: whether to apply scanner-calculated gain to the images, if not already applied. Defaults to True.
+                           Can be supplied as a list to apply gain to individual channels.
         :return: a list of cropped images from the scan in the order of the channels.
         """
-        frames = Frame.get_frames(self.tile)
-        images = [frame.get_image() for frame in frames]
+        frames = Frame.get_frames(self.tile, channels)
+        if isinstance(apply_gain, bool):
+            apply_gain = [apply_gain] * len(frames)
+        images = [f.get_image(input_path, a) for f, a in zip(frames, apply_gain)]
         return self.crop_images(images, crop_size, in_pixels)
 
     @classmethod
     def extract_images_for_list(
         cls,
         events: list[Self],
-        crop_size: int | list[int] = None,
+        crop_size: int | list[int] = 75,
         in_pixels: bool = True,
+        input_path: str = None,
+        channels: Iterable[int | str] = None,
+        apply_gain: bool | Iterable[bool] = True,
     ) -> list[list[np.ndarray]]:
         """
         Get the images for a list of events, ensuring that there is no wasteful reading
@@ -217,38 +229,40 @@ class Event:
                           Defaults to four times the size of the event.
         :param in_pixels: whether the crop size is in pixels or micrometers.
                           Defaults to pixels, and is ignored if crop_size is None.
+        :param input_path: the path to the input images. Will only work for lists of events
+                           from the same scan. Defaults to None (uses the scan's path).
+        :param channels: the channels to extract images for. Defaults to all channels.
+        :param apply_gain: whether to apply scanner-calculated gain to the images, if not already applied. Defaults to True.
+                           Can be supplied as a list to apply gain to individual channels.
         :return: a list of lists of cropped images for each event.
         """
+        # Validation
         if len(events) == 0:
             return []
-
-        # Populate a crop size if none provided
-        if crop_size is None:
-            crop_size = [4 * event.size for event in events]
-            in_pixels = True
-        # Propagate a constant crop size
-        elif isinstance(crop_size, int):
+        if isinstance(crop_size, int):
             crop_size = [crop_size] * len(events)
 
-        # Sort the events by tile; use a shallow copy to avoid modifying the original
+        # Get the order of the events when sorted by slide/tile
         order, _ = zip(*sorted(enumerate(events), key=lambda x: x[1].__repr__()))
 
         # Allocate the list to size
-        images = [None] * len(events)
+        crops = [[]] * len(events)
         last_tile = None
-        frame_images = None  # Holds large numpy arrays, so expensive to compare
-        # Iterate through in sorted order
+        images = None  # Holds large numpy arrays, so expensive to compare
+        # Iterate through in slide/tile sorted order
         for i in order:
             if last_tile != events[i].tile:
                 # Gather the frame images, preserving them for the next event
-                frames = Frame.get_frames(events[i].tile)
-                frame_images = [frame.get_image() for frame in frames]
-
+                frames = Frame.get_frames(events[i].tile, channels)
+                if isinstance(apply_gain, bool):
+                    gain_list = [apply_gain] * len(frames)
+                else:
+                    gain_list = apply_gain
+                images = [f.get_image(input_path, a) for f, a in zip(frames, gain_list)]
                 last_tile = events[i].tile
             # Use the frame images to crop the event images
-            # Preserve the original order using order[i]
-            images[i] = events[i].crop_images(frame_images, crop_size[i], in_pixels)
-        return images
+            crops[i] = events[i].crop_images(images, crop_size[i], in_pixels)
+        return crops
 
 
 class EventArray:
@@ -257,7 +271,7 @@ class EventArray:
     manipulate many events at once. A more separated version of the Event class.
     """
 
-    INFO_COLUMNS = ["slide_id", "tile", "roi", "x", "y", "size"]
+    INFO_COLUMNS = ["slide_id", "tile", "roi", "x", "y"]
 
     def __init__(
         self,
@@ -265,11 +279,11 @@ class EventArray:
         metadata: pd.DataFrame = None,
         features: pd.DataFrame = None,
     ):
-        # Info must be a DataFrame with columns "slide_id", "tile", "roi", "x", "y", "size"
+        # Info must be a DataFrame with columns "slide_id", "tile", "roi", "x", "y"
         if info is not None:
             if list(info.columns) != self.INFO_COLUMNS:
                 raise ValueError(
-                    "EventArray.info must have columns 'slide_id', 'tile', 'roi', 'x', 'y', 'size'"
+                    'EventArray.info must have columns "slide_id", "tile", "roi", "x", "y"'
                 )
             # Copy first to avoid modifying the original
             info = info.copy()
@@ -279,7 +293,6 @@ class EventArray:
             info["roi"] = info["roi"].astype(np.uint8)
             info["x"] = info["x"].round().astype(np.uint16)
             info["y"] = info["y"].round().astype(np.uint16)
-            info["size"] = info["size"].round().astype(np.uint16)
         # All DataFrames must all have the same number of rows
         if metadata is not None and (info is None or len(info) != len(metadata)):
             raise ValueError(
@@ -353,7 +366,9 @@ class EventArray:
 
         return is_equal
 
-    def get_sort_order(self, by: str | list[str], ascending: bool | list[bool] = True):
+    def get_sort_order(
+        self, by: Hashable | Sequence[Hashable], ascending: bool | Sequence[bool] = True
+    ):
         """
         Get the sort order for the EventArray by a column in the info, metadata, or features DataFrames.
         :param by: name of the column(s) to sort by.
@@ -363,7 +378,11 @@ class EventArray:
         columns = self.get(by)
         return columns.sort_values(by=by, ascending=ascending).index
 
-    def sort(self, by: str | list[str], ascending: bool | list[bool] = True) -> Self:
+    def sort(
+        self,
+        by: Hashable | Sequence[Hashable],
+        ascending: bool | Sequence[bool] = True,
+    ) -> Self:
         """
         Sort the EventArray by column(s) in the info, metadata, or features DataFrames.
         :param by: name of the column(s) to sort by.
@@ -382,14 +401,14 @@ class EventArray:
             features = None
         return EventArray(info, metadata, features)
 
-    def get(self, column_names: int | str | list[int] | list[str]) -> pd.DataFrame:
+    def get(self, column_names: Hashable | Sequence[Hashable]) -> pd.DataFrame:
         """
         Get a DataFrame with the specified columns from the EventArray, by value.
         :param column_names: the names of the columns to get.
         :return: a DataFrame with the specified columns.
         """
-        if isinstance(column_names, int) or isinstance(column_names, str):
-            column_names = [column_names]
+        if isinstance(column_names, Hashable):
+            column_names = [column_names]  # Drop into a list for the loop
         columns = []
         for column_name in column_names:
             if column_name in self.info.columns:
@@ -402,10 +421,10 @@ class EventArray:
                 raise ValueError(f"Column {column_name} not found in EventArray")
         return pd.concat(columns, axis=1)
 
-    def rows(self, rows) -> Self:
+    def rows(self, rows: Sequence[Hashable]) -> Self:
         """
         Get a subset of the EventArray rows based on a boolean or integer index, by value.
-        :param rows: the indices to get as a 1D boolean/integer list/array/series
+        :param rows: row labels, indices, or boolean mask; anything for .loc[]
         :return: a new EventArray with the subset of events.
         """
         info = self.info.loc[rows].reset_index(drop=True)
@@ -429,6 +448,8 @@ class EventArray:
             metadata=None if self.metadata is None else self.metadata.copy(),
             features=None if self.features is None else self.features.copy(),
         )
+
+    # TODO: add a "filter" convenience function that takes a column name and values to filter by
 
     def add_metadata(self, new_metadata: pd.Series | pd.DataFrame) -> None:
         """
@@ -467,7 +488,7 @@ class EventArray:
                 self.features[new_features.columns] = new_features
 
     @classmethod
-    def merge(cls, events: list[Self]) -> Self:
+    def merge(cls, events: Iterable[Self]) -> Self:
         """
         Combine EventArrays in a list into a single EventArray.
         :param events: the new list of events.
@@ -500,7 +521,7 @@ class EventArray:
 
     def to_events(
         self,
-        scans: Scan | list[Scan],
+        scans: Scan | Iterable[Scan],
         ignore_missing_scans=True,
         ignore_metadata=False,
         ignore_features=False,
@@ -560,7 +581,6 @@ class EventArray:
                     Tile(scan, self.info["tile"][i], self.info["roi"][i]),
                     self.info["x"][i],
                     self.info["y"][i],
-                    size=self.info["size"][i],
                     metadata=metadata,
                     features=features,
                 )
@@ -568,15 +588,11 @@ class EventArray:
         return events
 
     @classmethod
-    def from_events(cls, events: list[Event]) -> Self:
+    def from_events(cls, events: Iterable[Event]) -> Self:
         """
         Set the events in the EventArray to a new list of events.
         :param events: the new list of events.
         """
-        # Return an empty array if we were passed nothing
-        if events is None or len(events) == 0:
-            return EventArray()
-        # Otherwise, grab the info
         info = pd.DataFrame(
             {
                 "slide_id": [event.scan.slide_id for event in events],
@@ -584,7 +600,6 @@ class EventArray:
                 "roi": [event.tile.n_roi for event in events],
                 "x": [event.x for event in events],
                 "y": [event.y for event in events],
-                "size": [event.size for event in events],
             }
         )
         metadata_list = [event.metadata for event in events]
@@ -618,7 +633,6 @@ class EventArray:
         """
         # Make a copy of the info DataFrame and prepend "info_" to the column names
         output = self.info.copy()
-        output.columns = [f"info_{col}" for col in output.columns]
         # Combine with the metadata and prepend "metadata_" to the column names
         if self.metadata is not None:
             metadata = self.metadata.copy()
@@ -638,8 +652,7 @@ class EventArray:
         :return: a DataFrame with all the data in the EventArray.
         """
         # Split the columns into info, metadata, and features and strip prefix
-        info = df[[col for col in df.columns if col.startswith("info_")]].copy()
-        info.columns = [col.replace("info_", "") for col in info.columns]
+        info = df[[col for col in df.columns if col in cls.INFO_COLUMNS]].copy()
         if info.size == 0:
             info = None
         metadata = df[[col for col in df.columns if col.startswith("metadata_")]].copy()
@@ -700,7 +713,6 @@ class EventArray:
                 "roi": n_roi,
                 "x": mask_info["x"],
                 "y": mask_info["y"],
-                "size": mask_info["size"],
             },
         )
         # Extract a metadata column if desired
@@ -709,7 +721,7 @@ class EventArray:
         else:
             metadata = None
         # If any additional properties were extracted, add them as features
-        mask_info = mask_info.drop(columns=["id", "x", "y", "size"], errors="ignore")
+        mask_info = mask_info.drop(columns=["id", "x", "y"], errors="ignore")
         if len(mask_info.columns) > 0:
             features = mask_info
         else:
@@ -1088,11 +1100,8 @@ class EventArray:
         # Grab the info columns
         info = data[["slide_id", "frame_id", "cellx", "celly"]]
         info.columns = ["slide_id", "tile", "x", "y"]
-        info = info.assign(
-            roi=0,  # OCULAR only works on 1 ROI, as far as known
-            size=25,  # Static, for later montaging
-        )
-        info = info[["slide_id", "tile", "roi", "x", "y", "size"]]
+        info = info.assign(roi=0)  # OCULAR only works on 1 ROI, as far as known
+        info = info[["slide_id", "tile", "roi", "x", "y"]]
         # Metadata has duplicate columns for later convenience
         metadata = data
         # Certain columns tend to be problematic with mixed data formats...

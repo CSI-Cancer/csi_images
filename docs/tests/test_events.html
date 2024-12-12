@@ -96,12 +96,12 @@
 </span><span id="L-19"><a href="#L-19"><span class="linenos"> 19</span></a>
 </span><span id="L-20"><a href="#L-20"><span class="linenos"> 20</span></a><span class="k">def</span> <span class="nf">test_getting_event</span><span class="p">():</span>
 </span><span id="L-21"><a href="#L-21"><span class="linenos"> 21</span></a>    <span class="n">scan</span> <span class="o">=</span> <span class="n">Scan</span><span class="o">.</span><span class="n">load_txt</span><span class="p">(</span><span class="s2">&quot;tests/data&quot;</span><span class="p">)</span>
-</span><span id="L-22"><a href="#L-22"><span class="linenos"> 22</span></a>    <span class="n">tile</span> <span class="o">=</span> <span class="n">Tile</span><span class="p">(</span><span class="n">scan</span><span class="p">,</span> <span class="mi">1000</span><span class="p">)</span>
+</span><span id="L-22"><a href="#L-22"><span class="linenos"> 22</span></a>    <span class="n">tile</span> <span class="o">=</span> <span class="n">Tile</span><span class="p">(</span><span class="n">scan</span><span class="p">,</span> <span class="mi">0</span><span class="p">)</span>
 </span><span id="L-23"><a href="#L-23"><span class="linenos"> 23</span></a>    <span class="n">event</span> <span class="o">=</span> <span class="n">Event</span><span class="p">(</span>
 </span><span id="L-24"><a href="#L-24"><span class="linenos"> 24</span></a>        <span class="n">scan</span><span class="p">,</span>
 </span><span id="L-25"><a href="#L-25"><span class="linenos"> 25</span></a>        <span class="n">tile</span><span class="p">,</span>
-</span><span id="L-26"><a href="#L-26"><span class="linenos"> 26</span></a>        <span class="mi">515</span><span class="p">,</span>
-</span><span id="L-27"><a href="#L-27"><span class="linenos"> 27</span></a>        <span class="mi">411</span><span class="p">,</span>
+</span><span id="L-26"><a href="#L-26"><span class="linenos"> 26</span></a>        <span class="mi">516</span><span class="p">,</span>
+</span><span id="L-27"><a href="#L-27"><span class="linenos"> 27</span></a>        <span class="mi">278</span><span class="p">,</span>
 </span><span id="L-28"><a href="#L-28"><span class="linenos"> 28</span></a>    <span class="p">)</span>
 </span><span id="L-29"><a href="#L-29"><span class="linenos"> 29</span></a>    <span class="c1"># Test getting images</span>
 </span><span id="L-30"><a href="#L-30"><span class="linenos"> 30</span></a>    <span class="n">images</span> <span class="o">=</span> <span class="n">event</span><span class="o">.</span><span class="n">extract_images</span><span class="p">()</span>
@@ -121,8 +121,8 @@
 </span><span id="L-44"><a href="#L-44"><span class="linenos"> 44</span></a>    <span class="n">event</span> <span class="o">=</span> <span class="n">Event</span><span class="p">(</span>
 </span><span id="L-45"><a href="#L-45"><span class="linenos"> 45</span></a>        <span class="n">scan</span><span class="p">,</span>
 </span><span id="L-46"><a href="#L-46"><span class="linenos"> 46</span></a>        <span class="n">tile</span><span class="p">,</span>
-</span><span id="L-47"><a href="#L-47"><span class="linenos"> 47</span></a>        <span class="mi">2</span><span class="p">,</span>
-</span><span id="L-48"><a href="#L-48"><span class="linenos"> 48</span></a>        <span class="mi">1000</span><span class="p">,</span>
+</span><span id="L-47"><a href="#L-47"><span class="linenos"> 47</span></a>        <span class="mi">1346</span><span class="p">,</span>
+</span><span id="L-48"><a href="#L-48"><span class="linenos"> 48</span></a>        <span class="mi">9</span><span class="p">,</span>
 </span><span id="L-49"><a href="#L-49"><span class="linenos"> 49</span></a>    <span class="p">)</span>
 </span><span id="L-50"><a href="#L-50"><span class="linenos"> 50</span></a>    <span class="n">images</span> <span class="o">=</span> <span class="n">event</span><span class="o">.</span><span class="n">extract_images</span><span class="p">()</span>
 </span><span id="L-51"><a href="#L-51"><span class="linenos"> 51</span></a>    <span class="k">assert</span> <span class="nb">len</span><span class="p">(</span><span class="n">images</span><span class="p">)</span> <span class="o">==</span> <span class="mi">4</span>
@@ -133,7 +133,7 @@
 </span><span id="L-56"><a href="#L-56"><span class="linenos"> 56</span></a>
 </span><span id="L-57"><a href="#L-57"><span class="linenos"> 57</span></a>    <span class="k">if</span> <span class="n">SHOW_PLOTS</span><span class="p">:</span>
 </span><span id="L-58"><a href="#L-58"><span class="linenos"> 58</span></a>        <span class="k">for</span> <span class="n">image</span> <span class="ow">in</span> <span class="n">images</span><span class="p">:</span>
-</span><span id="L-59"><a href="#L-59"><span class="linenos"> 59</span></a>            <span class="n">cv2</span><span class="o">.</span><span class="n">imshow</span><span class="p">(</span><span class="s2">&quot;Events in the corner of a tile&quot;</span><span class="p">,</span> <span class="n">image</span><span class="p">)</span>
+</span><span id="L-59"><a href="#L-59"><span class="linenos"> 59</span></a>            <span class="n">cv2</span><span class="o">.</span><span class="n">imshow</span><span class="p">(</span><span class="s2">&quot;Events in the top-right corner of a tile&quot;</span><span class="p">,</span> <span class="n">image</span><span class="p">)</span>
 </span><span id="L-60"><a href="#L-60"><span class="linenos"> 60</span></a>            <span class="n">cv2</span><span class="o">.</span><span class="n">waitKey</span><span class="p">(</span><span class="mi">0</span><span class="p">)</span>
 </span><span id="L-61"><a href="#L-61"><span class="linenos"> 61</span></a>        <span class="n">cv2</span><span class="o">.</span><span class="n">destroyAllWindows</span><span class="p">()</span>
 </span><span id="L-62"><a href="#L-62"><span class="linenos"> 62</span></a>
@@ -391,7 +391,7 @@
 </span><span id="L-314"><a href="#L-314"><span class="linenos">314</span></a>
 </span><span id="L-315"><a href="#L-315"><span class="linenos">315</span></a>    <span class="c1"># Test different montages</span>
 </span><span id="L-316"><a href="#L-316"><span class="linenos">316</span></a>    <span class="n">montage</span> <span class="o">=</span> <span class="n">csi_images</span><span class="o">.</span><span class="n">make_montage</span><span class="p">(</span><span class="n">images</span><span class="p">,</span> <span class="p">[</span><span class="mi">0</span><span class="p">,</span> <span class="mi">1</span><span class="p">,</span> <span class="mi">2</span><span class="p">,</span> <span class="mi">3</span><span class="p">])</span>
-</span><span id="L-317"><a href="#L-317"><span class="linenos">317</span></a>    <span class="n">montage_shape</span> <span class="o">=</span> <span class="n">csi_images</span><span class="o">.</span><span class="n">get_montage_size</span><span class="p">(</span><span class="n">images</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span><span class="o">.</span><span class="n">shape</span><span class="p">,</span> <span class="mi">4</span><span class="p">)</span>
+</span><span id="L-317"><a href="#L-317"><span class="linenos">317</span></a>    <span class="n">montage_shape</span> <span class="o">=</span> <span class="n">csi_images</span><span class="o">.</span><span class="n">get_montage_shape</span><span class="p">(</span><span class="n">images</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span><span class="o">.</span><span class="n">shape</span><span class="p">,</span> <span class="mi">4</span><span class="p">)</span>
 </span><span id="L-318"><a href="#L-318"><span class="linenos">318</span></a>    <span class="k">assert</span> <span class="n">montage</span><span class="o">.</span><span class="n">shape</span> <span class="o">==</span> <span class="n">montage_shape</span>
 </span><span id="L-319"><a href="#L-319"><span class="linenos">319</span></a>
 </span><span id="L-320"><a href="#L-320"><span class="linenos">320</span></a>    <span class="k">if</span> <span class="n">SHOW_PLOTS</span><span class="p">:</span>
@@ -453,12 +453,12 @@
     <a class="headerlink" href="#test_getting_event"></a>
             <div class="pdoc-code codehilite"><pre><span></span><span id="test_getting_event-21"><a href="#test_getting_event-21"><span class="linenos">21</span></a><span class="k">def</span> <span class="nf">test_getting_event</span><span class="p">():</span>
 </span><span id="test_getting_event-22"><a href="#test_getting_event-22"><span class="linenos">22</span></a>    <span class="n">scan</span> <span class="o">=</span> <span class="n">Scan</span><span class="o">.</span><span class="n">load_txt</span><span class="p">(</span><span class="s2">&quot;tests/data&quot;</span><span class="p">)</span>
-</span><span id="test_getting_event-23"><a href="#test_getting_event-23"><span class="linenos">23</span></a>    <span class="n">tile</span> <span class="o">=</span> <span class="n">Tile</span><span class="p">(</span><span class="n">scan</span><span class="p">,</span> <span class="mi">1000</span><span class="p">)</span>
+</span><span id="test_getting_event-23"><a href="#test_getting_event-23"><span class="linenos">23</span></a>    <span class="n">tile</span> <span class="o">=</span> <span class="n">Tile</span><span class="p">(</span><span class="n">scan</span><span class="p">,</span> <span class="mi">0</span><span class="p">)</span>
 </span><span id="test_getting_event-24"><a href="#test_getting_event-24"><span class="linenos">24</span></a>    <span class="n">event</span> <span class="o">=</span> <span class="n">Event</span><span class="p">(</span>
 </span><span id="test_getting_event-25"><a href="#test_getting_event-25"><span class="linenos">25</span></a>        <span class="n">scan</span><span class="p">,</span>
 </span><span id="test_getting_event-26"><a href="#test_getting_event-26"><span class="linenos">26</span></a>        <span class="n">tile</span><span class="p">,</span>
-</span><span id="test_getting_event-27"><a href="#test_getting_event-27"><span class="linenos">27</span></a>        <span class="mi">515</span><span class="p">,</span>
-</span><span id="test_getting_event-28"><a href="#test_getting_event-28"><span class="linenos">28</span></a>        <span class="mi">411</span><span class="p">,</span>
+</span><span id="test_getting_event-27"><a href="#test_getting_event-27"><span class="linenos">27</span></a>        <span class="mi">516</span><span class="p">,</span>
+</span><span id="test_getting_event-28"><a href="#test_getting_event-28"><span class="linenos">28</span></a>        <span class="mi">278</span><span class="p">,</span>
 </span><span id="test_getting_event-29"><a href="#test_getting_event-29"><span class="linenos">29</span></a>    <span class="p">)</span>
 </span><span id="test_getting_event-30"><a href="#test_getting_event-30"><span class="linenos">30</span></a>    <span class="c1"># Test getting images</span>
 </span><span id="test_getting_event-31"><a href="#test_getting_event-31"><span class="linenos">31</span></a>    <span class="n">images</span> <span class="o">=</span> <span class="n">event</span><span class="o">.</span><span class="n">extract_images</span><span class="p">()</span>
@@ -478,8 +478,8 @@
 </span><span id="test_getting_event-45"><a href="#test_getting_event-45"><span class="linenos">45</span></a>    <span class="n">event</span> <span class="o">=</span> <span class="n">Event</span><span class="p">(</span>
 </span><span id="test_getting_event-46"><a href="#test_getting_event-46"><span class="linenos">46</span></a>        <span class="n">scan</span><span class="p">,</span>
 </span><span id="test_getting_event-47"><a href="#test_getting_event-47"><span class="linenos">47</span></a>        <span class="n">tile</span><span class="p">,</span>
-</span><span id="test_getting_event-48"><a href="#test_getting_event-48"><span class="linenos">48</span></a>        <span class="mi">2</span><span class="p">,</span>
-</span><span id="test_getting_event-49"><a href="#test_getting_event-49"><span class="linenos">49</span></a>        <span class="mi">1000</span><span class="p">,</span>
+</span><span id="test_getting_event-48"><a href="#test_getting_event-48"><span class="linenos">48</span></a>        <span class="mi">1346</span><span class="p">,</span>
+</span><span id="test_getting_event-49"><a href="#test_getting_event-49"><span class="linenos">49</span></a>        <span class="mi">9</span><span class="p">,</span>
 </span><span id="test_getting_event-50"><a href="#test_getting_event-50"><span class="linenos">50</span></a>    <span class="p">)</span>
 </span><span id="test_getting_event-51"><a href="#test_getting_event-51"><span class="linenos">51</span></a>    <span class="n">images</span> <span class="o">=</span> <span class="n">event</span><span class="o">.</span><span class="n">extract_images</span><span class="p">()</span>
 </span><span id="test_getting_event-52"><a href="#test_getting_event-52"><span class="linenos">52</span></a>    <span class="k">assert</span> <span class="nb">len</span><span class="p">(</span><span class="n">images</span><span class="p">)</span> <span class="o">==</span> <span class="mi">4</span>
@@ -490,7 +490,7 @@
 </span><span id="test_getting_event-57"><a href="#test_getting_event-57"><span class="linenos">57</span></a>
 </span><span id="test_getting_event-58"><a href="#test_getting_event-58"><span class="linenos">58</span></a>    <span class="k">if</span> <span class="n">SHOW_PLOTS</span><span class="p">:</span>
 </span><span id="test_getting_event-59"><a href="#test_getting_event-59"><span class="linenos">59</span></a>        <span class="k">for</span> <span class="n">image</span> <span class="ow">in</span> <span class="n">images</span><span class="p">:</span>
-</span><span id="test_getting_event-60"><a href="#test_getting_event-60"><span class="linenos">60</span></a>            <span class="n">cv2</span><span class="o">.</span><span class="n">imshow</span><span class="p">(</span><span class="s2">&quot;Events in the corner of a tile&quot;</span><span class="p">,</span> <span class="n">image</span><span class="p">)</span>
+</span><span id="test_getting_event-60"><a href="#test_getting_event-60"><span class="linenos">60</span></a>            <span class="n">cv2</span><span class="o">.</span><span class="n">imshow</span><span class="p">(</span><span class="s2">&quot;Events in the top-right corner of a tile&quot;</span><span class="p">,</span> <span class="n">image</span><span class="p">)</span>
 </span><span id="test_getting_event-61"><a href="#test_getting_event-61"><span class="linenos">61</span></a>            <span class="n">cv2</span><span class="o">.</span><span class="n">waitKey</span><span class="p">(</span><span class="mi">0</span><span class="p">)</span>
 </span><span id="test_getting_event-62"><a href="#test_getting_event-62"><span class="linenos">62</span></a>        <span class="n">cv2</span><span class="o">.</span><span class="n">destroyAllWindows</span><span class="p">()</span>
 </span></pre></div>
@@ -853,7 +853,7 @@
 </span><span id="test_event_montages-315"><a href="#test_event_montages-315"><span class="linenos">315</span></a>
 </span><span id="test_event_montages-316"><a href="#test_event_montages-316"><span class="linenos">316</span></a>    <span class="c1"># Test different montages</span>
 </span><span id="test_event_montages-317"><a href="#test_event_montages-317"><span class="linenos">317</span></a>    <span class="n">montage</span> <span class="o">=</span> <span class="n">csi_images</span><span class="o">.</span><span class="n">make_montage</span><span class="p">(</span><span class="n">images</span><span class="p">,</span> <span class="p">[</span><span class="mi">0</span><span class="p">,</span> <span class="mi">1</span><span class="p">,</span> <span class="mi">2</span><span class="p">,</span> <span class="mi">3</span><span class="p">])</span>
-</span><span id="test_event_montages-318"><a href="#test_event_montages-318"><span class="linenos">318</span></a>    <span class="n">montage_shape</span> <span class="o">=</span> <span class="n">csi_images</span><span class="o">.</span><span class="n">get_montage_size</span><span class="p">(</span><span class="n">images</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span><span class="o">.</span><span class="n">shape</span><span class="p">,</span> <span class="mi">4</span><span class="p">)</span>
+</span><span id="test_event_montages-318"><a href="#test_event_montages-318"><span class="linenos">318</span></a>    <span class="n">montage_shape</span> <span class="o">=</span> <span class="n">csi_images</span><span class="o">.</span><span class="n">get_montage_shape</span><span class="p">(</span><span class="n">images</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span><span class="o">.</span><span class="n">shape</span><span class="p">,</span> <span class="mi">4</span><span class="p">)</span>
 </span><span id="test_event_montages-319"><a href="#test_event_montages-319"><span class="linenos">319</span></a>    <span class="k">assert</span> <span class="n">montage</span><span class="o">.</span><span class="n">shape</span> <span class="o">==</span> <span class="n">montage_shape</span>
 </span><span id="test_event_montages-320"><a href="#test_event_montages-320"><span class="linenos">320</span></a>
 </span><span id="test_event_montages-321"><a href="#test_event_montages-321"><span class="linenos">321</span></a>    <span class="k">if</span> <span class="n">SHOW_PLOTS</span><span class="p">:</span>
