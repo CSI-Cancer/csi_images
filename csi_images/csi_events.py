@@ -281,9 +281,13 @@ class EventArray:
     ):
         # Info must be a DataFrame with columns "slide_id", "tile", "roi", "x", "y"
         if info is not None:
-            if list(info.columns) != self.INFO_COLUMNS:
+            # Special case: "roi" is often not required, so we'll fill in if its missing
+            if "roi" not in info.columns:
+                info["roi"] = 0
+            if set(info.columns) != set(self.INFO_COLUMNS):
                 raise ValueError(
-                    'EventArray.info must have columns "slide_id", "tile", "roi", "x", "y"'
+                    f"EventArray.info must have columns:"
+                    f"{self.INFO_COLUMNS}; had {list(info.columns)}"
                 )
             # Copy first to avoid modifying the original
             info = info.copy()
@@ -293,6 +297,8 @@ class EventArray:
             info["roi"] = info["roi"].astype(np.uint8)
             info["x"] = info["x"].round().astype(np.uint16)
             info["y"] = info["y"].round().astype(np.uint16)
+            # Ensure that the columns are in the right order
+            info = info[self.INFO_COLUMNS]
         # All DataFrames must all have the same number of rows
         if metadata is not None and (info is None or len(info) != len(metadata)):
             raise ValueError(
@@ -646,9 +652,14 @@ class EventArray:
         return output
 
     @classmethod
-    def from_dataframe(cls, df) -> Self:
+    def from_dataframe(
+        cls, df, metadata_prefix: str = "metadata_", features_prefix: str = "features_"
+    ) -> Self:
         """
         From a single, special DataFrame, create an EventArray.
+        :param df: the DataFrame to convert to an EventArray.
+        :param metadata_prefix: the prefix for metadata columns.
+        :param features_prefix: the prefix for features columns.
         :return: a DataFrame with all the data in the EventArray.
         """
         # Split the columns into info, metadata, and features and strip prefix
@@ -656,11 +667,15 @@ class EventArray:
         if info.size == 0:
             info = None
         metadata = df[[col for col in df.columns if col.startswith("metadata_")]].copy()
-        metadata.columns = [col.replace("metadata_", "") for col in metadata.columns]
+        metadata.columns = [
+            col.replace(metadata_prefix, "") for col in metadata.columns
+        ]
         if metadata.size == 0:
             metadata = None
         features = df[[col for col in df.columns if col.startswith("features_")]].copy()
-        features.columns = [col.replace("features_", "") for col in features.columns]
+        features.columns = [
+            col.replace(features_prefix, "") for col in features.columns
+        ]
         if features.size == 0:
             features = None
         return cls(info=info, metadata=metadata, features=features)
@@ -734,19 +749,28 @@ class EventArray:
         :param output_path:
         :return:
         """
+        if not output_path.endswith(".csv"):
+            output_path += ".csv"
         self.to_dataframe().to_csv(output_path, index=False)
         return os.path.exists(output_path)
 
     @classmethod
-    def load_csv(cls, input_path: str) -> Self:
+    def load_csv(
+        cls,
+        input_path: str,
+        metadata_prefix: str = "metadata_",
+        features_prefix: str = "features_",
+    ) -> Self:
         """
         Load the events from an CSV file, including metadata and features.
         :param input_path:
+        :param metadata_prefix:
+        :param features_prefix:
         :return:
         """
         # Load the CSV file
         df = pd.read_csv(input_path)
-        return cls.from_dataframe(df)
+        return cls.from_dataframe(df, metadata_prefix, features_prefix)
 
     def save_hdf5(self, output_path: str) -> bool:
         """
@@ -756,6 +780,8 @@ class EventArray:
         :param output_path:
         :return:
         """
+        if not output_path.endswith(".hdf5") and not output_path.endswith(".h5"):
+            output_path += ".hdf5"
         # Open the output_path as an HDF5 file
         with pd.HDFStore(output_path) as store:
             # Store the dataframes in the HDF5 file

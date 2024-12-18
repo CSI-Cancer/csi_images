@@ -22,6 +22,10 @@ try:
     import tifffile
 except ImportError:
     tifffile = None
+try:
+    import skimage.io as skimageio
+except ImportError:
+    skimageio = None
 
 
 class Frame:
@@ -108,32 +112,27 @@ class Frame:
                            if the scanner calculated but did not apply gain. Defaults to True.
         :return: the array representing the image.
         """
-        if tifffile is None:
-            raise ModuleNotFoundError(
-                "tifffile library not installed. "
-                "Install csi-images with [imageio] option to resolve."
-            )
-
         file_path = self.get_file_path(input_path)
-
-        image = None
 
         # Check for the file
         if not os.path.exists(file_path):
             # Alternative: could be a .jpg/.jpeg file, test both
-            jpeg_path = os.path.splitext(file_path)[0] + ".jpg"
-            if os.path.exists(jpeg_path):
-                file_path = jpeg_path
-            jpeg_path = os.path.splitext(file_path)[0] + ".jpeg"
-            if os.path.exists(jpeg_path):
-                file_path = jpeg_path
-            # If we've found a .jpg/.jpeg, try loading it as compressed
-            if file_path == jpeg_path:
-                image = self._get_jpeg_image(file_path)
+            if os.path.exists(os.path.splitext(file_path)[0] + ".jpg"):
+                image = self._get_jpeg_image(os.path.splitext(file_path)[0] + ".jpg")
+            elif os.path.exists(os.path.splitext(file_path)[0] + ".jpeg"):
+                image = self._get_jpeg_image(os.path.splitext(file_path)[0] + ".jpeg")
             else:
-                raise FileNotFoundError(f"Could not find image at {file_path}")
+                raise FileNotFoundError(
+                    f"Could not find image at {file_path} or "
+                    f"any format alternatives (.jpg, .jpeg)."
+                )
         else:
             # Load the image
+            if tifffile is None:
+                raise ModuleNotFoundError(
+                    "tifffile library not installed. "
+                    "Install csi-images with [imageio] option to resolve."
+                )
             image = tifffile.imread(file_path)
         if image is None or image.size == 0:
             raise ValueError(f"Could not load image from {file_path}")
@@ -141,8 +140,42 @@ class Frame:
             image = image * self.scan.channels[self.channel].intensity
         return image
 
-    def _get_jpeg_image(self, input_path: str) -> np.ndarray:
-        raise NotImplementedError("JPEG image loading not yet implemented.")
+    @staticmethod
+    def _get_jpeg_image(input_path: str) -> np.ndarray:
+        if skimageio is None:
+            raise ModuleNotFoundError(
+                "scikit-image library not installed. "
+                "Install csi-images with [imageio] option to resolve."
+            )
+        image = skimageio.imread(input_path)
+        if os.path.isfile(os.path.splitext(input_path)[0] + ".tags"):
+            min_name = "PreservedMinValue"
+            max_name = "PreservedMaxValue"
+            min_value, max_value = -1, -1
+            with open(os.path.splitext(input_path)[0] + ".tags", "r") as f:
+                for line in f:
+                    if line.startswith(min_name):
+                        min_value = float(line.split("=")[1].strip())
+                    elif line.startswith(max_name):
+                        max_value = float(line.split("=")[1].strip())
+                    if min_value != -1 and max_value != -1:
+                        break
+            if min_value != -1 and max_value != -1:
+                if max_value > 1:
+                    raise ValueError(f"{max_name} is greater than 1; unexpected .tags")
+                if min_value < 0:
+                    raise ValueError(f"{min_name} is less than 0; unexpected .tags")
+                # Return to [0, 1], scale + offset, then return to a 16-bit image
+                image = image / np.iinfo(image.dtype).max
+                image = image * (max_value - min_value) + min_value
+                image = (image * np.iinfo(np.uint16).max).astype(np.uint16)
+            else:
+                raise ValueError(
+                    f"Could not find {min_name} and {max_name} in .tags file."
+                )
+        else:
+            raise FileNotFoundError(f"Could not find .tags file for {input_path}")
+        return image
 
     def check_image(self, input_path: str = None) -> bool:
         """

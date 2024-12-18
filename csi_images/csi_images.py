@@ -1,5 +1,7 @@
 import numpy as np
 import pandas as pd
+
+from PIL import ImageFont, ImageDraw
 from skimage.measure import regionprops_table
 
 
@@ -106,6 +108,9 @@ def make_montage(
     images: list[np.ndarray],
     order: list[int] = None,
     composites: dict[int, tuple[float, float, float]] = None,
+    labels: list[str] = None,
+    font: str = "Roboto-Regular.ttf",
+    font_size: int | float = 0.5,
     border_size: int = 1,
     horizontal: bool = True,
     dtype=np.uint8,
@@ -116,6 +121,12 @@ def make_montage(
     :param images: list of numpy arrays representing the images.
     :param order: list of indices for the images going into the montage.
     :param composites: dictionary of indices and RGB tuples for a composite.
+    :param labels: list of labels for the images. If length == len(order), will apply to
+    grayscale images only; if length == len(order) + 1 and composites exist, will apply
+    to all images.
+    :param font: path to a font file for labels. See pillow's ImageFont for details.
+    :param font_size: size of the font for labels. If a float, calculates a font size as
+    a fraction of the image size.
     :param border_size: width of the border between images.
     :param horizontal: whether to stack images horizontally or vertically.
     :param dtype: the dtype of the output montage.
@@ -140,6 +151,9 @@ def make_montage(
         np.iinfo(dtype).max,  # White fill
         dtype=dtype,
     )
+
+    if isinstance(font_size, float):
+        font_size = int(min(images[0].shape) * font_size)
 
     # Populate the montage with images
     offset = border_size  # Keeps track of the offset for the next image
