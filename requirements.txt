@@ -5,10 +5,10 @@ numpy
 tables
 PyYAML
 aicspylibczi
-tifffile
-imagecodecs
+tifffile[codecs]
 scikit-image
 opencv-python
+Pillow
 pyreadr
 
 pytest

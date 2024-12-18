@@ -60,7 +60,7 @@ class Tile:
             )
 
     def __repr__(self) -> str:
-        return f"{self.scan.slide_id}-{self.n}"
+        return f"{self.scan.slide_id}-{self.n_roi}-{self.n}"
 
     def __eq__(self, other) -> bool:
         return self.__repr__() == other.__repr__()

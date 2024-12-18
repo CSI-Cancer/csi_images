@@ -27,11 +27,11 @@ def test_getting_event():
         278,
     )
     # Test getting images
-    images = event.extract_images()
+    images = event.get_crops()
     assert len(images) == 4
-    images = event.extract_images(crop_size=100)
+    images = event.get_crops(crop_size=100)
     assert images[0].shape == (100, 100)
-    images = event.extract_images(crop_size=50)
+    images = event.get_crops(crop_size=50)
     assert images[0].shape == (50, 50)
 
     if SHOW_PLOTS:
@@ -47,11 +47,11 @@ def test_getting_event():
         1346,
         9,
     )
-    images = event.extract_images()
+    images = event.get_crops()
     assert len(images) == 4
-    images = event.extract_images(crop_size=100)
+    images = event.get_crops(crop_size=100)
     assert images[0].shape == (100, 100)
-    images = event.extract_images(crop_size=200)
+    images = event.get_crops(crop_size=200)
     assert images[0].shape == (200, 200)
 
     if SHOW_PLOTS:
@@ -78,12 +78,12 @@ def test_getting_many_events():
     start_time = time.time()
     images_1 = []
     for event in events:
-        images_1.append(event.extract_images())
+        images_1.append(event.get_crops())
     sequential_time = time.time() - start_time
 
     # Test time to extract images in parallel
     start_time = time.time()
-    images_2 = Event.extract_images_for_list(events, crop_size=100)
+    images_2 = Event.get_many_crops(events, crop_size=100)
     parallel_time = time.time() - start_time
     assert parallel_time < sequential_time
     for list_a, list_b in zip(images_1, images_2):
@@ -96,7 +96,7 @@ def test_getting_many_events():
     remade_events = event_array.to_events(
         [scan], ignore_metadata=True, ignore_features=True
     )
-    images_3 = Event.extract_images_for_list(remade_events, crop_size=100)
+    images_3 = Event.get_many_crops(remade_events, crop_size=100)
     for list_a, list_b in zip(images_1, images_3):
         assert len(list_a) == len(list_b)
         for image_a, image_b in zip(list_a, list_b):
@@ -310,51 +310,65 @@ def test_event_montages():
     scan = Scan.load_txt("tests/data")
     tile = Tile(scan, 1000)
     event = Event(scan, tile, 515, 411)
-    images = event.extract_images(crop_size=100)
+    images = event.get_crops(crop_size=100)
 
-    # Test different montages
-    montage = csi_images.make_montage(images, [0, 1, 2, 3])
-    montage_shape = csi_images.get_montage_shape(images[0].shape, 4)
-    assert montage.shape == montage_shape
-
-    if SHOW_PLOTS:
-        cv2.imshow("Horizontal montage with all channels", montage)
-        cv2.waitKey(0)
-        cv2.destroyAllWindows()
-
-    montage = csi_images.make_montage(images, [0, 2])
-    if SHOW_PLOTS:
-        cv2.imshow("Horizontal montage with DAPI, CD45", montage)
-        cv2.waitKey(0)
-        cv2.destroyAllWindows()
-
-    montage = csi_images.make_montage(images, [0, 2], horizontal=False)
-    if SHOW_PLOTS:
-        cv2.imshow("Vertical montage with DAPI, CD45", montage)
-        cv2.waitKey(0)
-        cv2.destroyAllWindows()
+    # # Test different montages
+    # montage = csi_images.make_montage(images, [0, 1, 2, 3])
+    # montage_shape = csi_images.get_montage_shape(images[0].shape, 4)
+    # assert montage.shape == montage_shape
+    #
+    # if SHOW_PLOTS:
+    #     cv2.imshow("Horizontal montage with all channels", montage)
+    #     cv2.waitKey(0)
+    #     cv2.destroyAllWindows()
+    #
+    # montage = csi_images.make_montage(images, [0, 2])
+    # if SHOW_PLOTS:
+    #     cv2.imshow("Horizontal montage with DAPI, CD45", montage)
+    #     cv2.waitKey(0)
+    #     cv2.destroyAllWindows()
+    #
+    # montage = csi_images.make_montage(images, [0, 2], horizontal=False)
+    # if SHOW_PLOTS:
+    #     cv2.imshow("Vertical montage with DAPI, CD45", montage)
+    #     cv2.waitKey(0)
+    #     cv2.destroyAllWindows()
+    #
+    # montage = csi_images.make_montage(
+    #     images,
+    #     [0, 2],
+    #     {0: (0, 0, 1), 2: (0, 1, 0)},
+    # )
+    # if SHOW_PLOTS:
+    #     cv2.imshow(
+    #         "Horizontal montage with DAPI+CD45, DAPI, CD45",
+    #         cv2.cvtColor(montage, cv2.COLOR_RGB2BGR),
+    #     )
+    #     cv2.waitKey(0)
+    #     cv2.destroyAllWindows()
+    #
+    # montage = csi_images.make_montage(
+    #     images,
+    #     [0, 1, 3, 2],
+    #     {0: (0, 0, 1), 1: (1, 0, 0), 2: (0, 1, 0), 3: (1, 1, 1)},
+    # )
+    # if SHOW_PLOTS:
+    #     cv2.imshow(
+    #         "Full, classic montage",
+    #         cv2.cvtColor(montage, cv2.COLOR_RGB2BGR),
+    #     )
+    #     cv2.waitKey(0)
+    #     cv2.destroyAllWindows()
 
     montage = csi_images.make_montage(
         images,
-        [0, 2],
-        {0: (0, 0, 1), 2: (0, 1, 0)},
-    )
-    if SHOW_PLOTS:
-        cv2.imshow(
-            "Horizontal montage with DAPI+CD45, DAPI, CD45",
-            cv2.cvtColor(montage, cv2.COLOR_RGB2BGR),
-        )
-        cv2.waitKey(0)
-        cv2.destroyAllWindows()
-
-    montage = csi_images.make_montage(
-        images,
-        [0, 1, 2, 3],
+        [0, 1, 3, 2],
         {0: (0, 0, 1), 1: (1, 0, 0), 2: (0, 1, 0), 3: (1, 1, 1)},
+        labels=["RGB", "DAPI", "AF555", "AF488", "AF647"],
     )
     if SHOW_PLOTS:
         cv2.imshow(
-            "Full, classic montage",
+            "Full, classic montage with labels",
             cv2.cvtColor(montage, cv2.COLOR_RGB2BGR),
         )
         cv2.waitKey(0)

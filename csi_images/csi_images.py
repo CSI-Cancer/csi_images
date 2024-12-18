@@ -1,8 +1,11 @@
 import numpy as np
 import pandas as pd
 
-from PIL import ImageFont, ImageDraw
+from PIL import Image, ImageFont, ImageDraw
 from skimage.measure import regionprops_table
+
+# Avoid opening multiple fonts and re-opening fonts
+opened_font: ImageFont.FreeTypeFont | None = None
 
 
 def extract_mask_info(
@@ -109,8 +112,10 @@ def make_montage(
     order: list[int] = None,
     composites: dict[int, tuple[float, float, float]] = None,
     labels: list[str] = None,
-    font: str = "Roboto-Regular.ttf",
-    font_size: int | float = 0.5,
+    label_font: str = "Roboto-Regular.ttf",
+    label_size: int | float = 0.18,
+    label_outline: bool = True,
+    colored_labels: bool = True,
     border_size: int = 1,
     horizontal: bool = True,
     dtype=np.uint8,
@@ -124,9 +129,11 @@ def make_montage(
     :param labels: list of labels for the images. If length == len(order), will apply to
     grayscale images only; if length == len(order) + 1 and composites exist, will apply
     to all images.
-    :param font: path to a font file for labels. See pillow's ImageFont for details.
-    :param font_size: size of the font for labels. If a float, calculates a font size as
-    a fraction of the image size.
+    :param label_font: path to a font file for labels. See PIL.ImageFont for details.
+    :param label_size: size of the font for labels. If a float, calculates a font size
+    as a fraction of the image size.
+    :param label_outline: whether to draw an outline around the label text.
+    :param colored_labels: whether to color the labels based on the composites.
     :param border_size: width of the border between images.
     :param horizontal: whether to stack images horizontally or vertically.
     :param dtype: the dtype of the output montage.
@@ -143,6 +150,10 @@ def make_montage(
     if order is None and composites is None:
         raise ValueError("No images or composites requested.")
 
+    # Adapt label font size if necessary
+    if isinstance(label_size, float):
+        label_size = int(images[0].shape[1] * label_size)
+
     # Populate the montage with black
     n_images = len(order) if order is not None else 0
     n_images += 1 if composites is not None else 0
@@ -152,8 +163,17 @@ def make_montage(
         dtype=dtype,
     )
 
-    if isinstance(font_size, float):
-        font_size = int(min(images[0].shape) * font_size)
+    # Load font if necessary
+    global opened_font
+    if labels is not None and len(order) <= len(labels) <= n_images:
+        if (
+            opened_font is None
+            or opened_font.path != label_font
+            or opened_font.size != label_size
+        ):
+            opened_font = ImageFont.truetype(label_font, label_size)
+    elif labels is not None:
+        raise ValueError("Number of labels must be 0, match order, or match images.")
 
     # Populate the montage with images
     offset = border_size  # Keeps track of the offset for the next image
@@ -166,6 +186,30 @@ def make_montage(
             list(composites.values()),
         )
         image = scale_bit_depth(image, dtype)
+        if labels is not None and len(labels) == n_images:
+            # Draw a label on the composite
+            pillow_image = Image.fromarray(image)
+            # Determine the fill color based on the average intensity of the image
+            included_height = max(label_size * 2, image.shape[1])
+            if get_image_lightness(image[:, -included_height:, :]) > 50:
+                text_fill = (0, 0, 0)
+                outline_fill = (255, 255, 255)
+            else:
+                text_fill = (255, 255, 255)
+                outline_fill = (0, 0, 0)
+            draw = ImageDraw.Draw(pillow_image, "RGB")
+            draw.text(
+                (image.shape[0] // 2, image.shape[1]),
+                labels[0],
+                fill=text_fill,
+                anchor="md",  # Middle, descender (absolute bottom of font)
+                font=opened_font,
+                stroke_width=round(label_size / 10) if label_outline else 0,
+                stroke_fill=outline_fill,
+            )
+            image = np.asarray(pillow_image)
+            labels = labels[1:]
+
         if horizontal:
             montage[
                 border_size : border_size + image_height,
@@ -180,10 +224,40 @@ def make_montage(
             offset += image_height + border_size
 
     # Grayscale order next
-    for i in order:
-        image = images[i]
+    for i, o in enumerate(order):
+        image = images[o]
         image = scale_bit_depth(image, dtype)
         image = np.tile(image[..., None], (1, 1, 3))  # Make 3-channel
+
+        if labels is not None and len(labels) == len(order):
+            pillow_image = Image.fromarray(image)
+            if colored_labels and o in composites:
+                text_fill = tuple(round(255 * rgb_f) for rgb_f in composites[o])
+                if get_lightness(composites[o]) > 50:
+                    outline_fill = (0, 0, 0)
+                else:
+                    outline_fill = (255, 255, 255)
+            else:
+                # Determine the color based on the average intensity of the image
+                included_height = max(label_size * 2, image.shape[1])
+                if get_image_lightness(image[:, -included_height:, :]) > 50:
+                    text_fill = (0, 0, 0)
+                    outline_fill = (255, 255, 255)
+                else:
+                    text_fill = (255, 255, 255)
+                    outline_fill = (0, 0, 0)
+            draw = ImageDraw.Draw(pillow_image, "RGB")
+            draw.text(
+                (image.shape[0] // 2, image.shape[1]),
+                labels[i],
+                fill=text_fill,
+                anchor="md",  # Middle, descender (absolute bottom of font)
+                font=opened_font,
+                stroke_width=round(label_size / 10) if label_outline else 0,
+                stroke_fill=outline_fill,
+            )
+            image = np.asarray(pillow_image)
+
         if horizontal:
             montage[
                 border_size : border_size + image_height,
@@ -288,3 +362,40 @@ def scale_bit_depth(
     scale = scale * out_max / in_max
     image = (image * scale).astype(dtype)
     return image
+
+
+def get_image_lightness(image: np.ndarray) -> float:
+    """
+    Calculate the lightness of an sRGB image, taking shortcuts for speed.
+    :param image: numpy array representing the sRGB image.
+    :return: approximate perceived lightness of the image, from 0 to 100.
+    """
+    # Scale image to [0, 1]
+    if np.issubdtype(image.dtype, np.unsignedinteger):
+        image = image / np.iinfo(image.dtype).max
+    # Rough conversion to linear RGB
+    image = image**2.2
+    # Average to a single color and return that color's lightness
+    color = np.mean(image, axis=(0, 1))
+    return get_lightness((color[0], color[1], color[2]), srgb=False)
+
+
+def get_lightness(color: tuple[float, float, float], srgb: bool = True) -> float:
+    """
+    Calculate the lightness of an sRGB color, taking shortcuts for speed.
+    :param color: an sRGB or linear RGB color as a tuple, with values in [0, 1].
+    :param srgb: whether the color is in sRGB or linear RGB.
+    :return: approximate perceived lightness of the color, from 0 to 100.
+    """
+    if srgb:
+        # Convert to linear color, rough and quick
+        rgb = color[0] ** 2.2, color[1] ** 2.2, color[2] ** 2.2
+    else:
+        rgb = color
+    # Convert to luminance
+    luminance = 0.2126 * rgb[0] + 0.7152 * rgb[1] + 0.0722 * rgb[2]
+    # Convert to perceived lightness
+    if luminance <= 0.008856:
+        return 903.3 * luminance
+    else:
+        return 116 * luminance ** (1 / 3) - 16

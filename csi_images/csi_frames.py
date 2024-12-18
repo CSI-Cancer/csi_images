@@ -19,50 +19,43 @@ try:
 except ImportError:
     csi_images = None
 try:
-    import tifffile
+    import imageio.v3 as imageio
 except ImportError:
-    tifffile = None
-try:
-    import skimage.io as skimageio
-except ImportError:
-    skimageio = None
+    imageio = None
 
 
 class Frame:
-    def __init__(self, scan: Scan, tile: Tile, channel: int | str):
-        self.scan = scan
+    def __init__(self, tile: Tile, channel: int | str):
         self.tile = tile
         if isinstance(channel, int):
             self.channel = channel
-            if self.channel < 0 or self.channel >= len(scan.channels):
+            if self.channel < 0 or self.channel >= len(tile.scan.channels):
                 raise ValueError(
                     f"Channel index {self.channel} is out of bounds for scan."
                 )
         elif isinstance(channel, str):
-            self.channel = self.scan.get_channel_indices([channel])[0]
+            self.channel = tile.scan.get_channel_indices([channel])[0]
         else:
             raise ValueError("Channel must be an integer or a string.")
 
     def __repr__(self) -> str:
-        return f"{self.scan.slide_id}-{self.tile.n}-{self.scan.channels[self.channel].name}"
+        return f"{self.tile}-{self.tile.scan.channels[self.channel].name}"
 
     def __eq__(self, other) -> bool:
         return self.__repr__() == other.__repr__()
 
-    def get_file_path(
-        self, input_path: str = None, file_extension: str = ".tif"
-    ) -> str:
+    def get_file_path(self, input_path: str = None, ext: str = ".tif") -> str:
         """
         Get the file path for the frame, optionally changing
         the scan path and file extension.
         :param input_path: the path to the scan's directory. If None, defaults to
                            the path loaded in the frame's tile's scan object.
-        :param file_extension: the image file extension. Defaults to .tif.
+        :param ext: the image file extension. Defaults to .tif.
         :return: the file path.
         """
         if input_path is None:
-            input_path = self.scan.path
-            if len(self.scan.roi) > 1:
+            input_path = self.tile.scan.path
+            if len(self.tile.scan.roi) > 1:
                 input_path = os.path.join(input_path, f"roi_{self.tile.n_roi}")
         # Remove trailing slashes
         if input_path[-1] == os.sep:
@@ -72,33 +65,37 @@ class Frame:
             input_path = os.path.join(input_path, "proc")
         # Should be a directory; append the file name
         if os.path.isdir(input_path):
-            input_path = os.path.join(input_path, self.get_file_name())
+            input_path = os.path.join(input_path, self.get_file_name(ext))
         else:
             raise ValueError(f"Input path {input_path} is not a directory.")
         return input_path
 
-    def get_file_name(self, file_extension: str = ".tif") -> str:
+    def get_file_name(self, ext: str = ".tif") -> str:
         """
         Get the file name for the frame, handling different name conventions by scanner.
-        :param file_extension: the image file extension. Defaults to .tif.
+        :param ext: the image file extension. Defaults to .tif.
         :return: the file name.
         """
-        if self.scan.scanner_id.startswith(Scan.Type.AXIOSCAN7.value):
-            channel_name = self.scan.channels[self.channel].name
+        if self.tile.scan.scanner_id.startswith(Scan.Type.AXIOSCAN7.value):
+            channel_name = self.tile.scan.channels[self.channel].name
             x = self.tile.x
             y = self.tile.y
-            file_name = f"{channel_name}-X{x:03}-Y{y:03}{file_extension}"
-        elif self.scan.scanner_id.startswith(Scan.Type.BZSCANNER.value):
-            channel_name = self.scan.channels[self.channel].name
-            real_channel_index = list(self.scan.BZSCANNER_CHANNEL_MAP.values()).index(
-                channel_name
-            )
-            total_tiles = self.scan.roi[0].tile_rows * self.scan.roi[0].tile_cols
+            file_name = f"{channel_name}-X{x:03}-Y{y:03}{ext}"
+        elif self.tile.scan.scanner_id.startswith(Scan.Type.BZSCANNER.value):
+            # BZScanner has channels in a specific order
+            channel_name = self.tile.scan.channels[self.channel].name
+            real_channel_index = list(
+                self.tile.scan.BZSCANNER_CHANNEL_MAP.values()
+            ).index(channel_name)
+            # Determine total tiles
+            roi = self.tile.scan.roi[self.tile.n_roi]
+            total_tiles = roi.tile_rows * roi.tile_cols
+            # Offset is based on total tiles and "real" channel index
             tile_offset = (real_channel_index * total_tiles) + 1  # 1-indexed
             n_bzscanner = self.tile.n + tile_offset
-            file_name = f"Tile{n_bzscanner:06}{file_extension}"
+            file_name = f"Tile{n_bzscanner:06}{ext}"
         else:
-            raise ValueError(f"Scanner {self.scan.scanner_id} not supported.")
+            raise ValueError(f"Scanner {self.tile.scan.scanner_id} not supported.")
         return file_name
 
     def get_image(self, input_path: str = None, apply_gain: bool = True) -> np.ndarray:
@@ -128,26 +125,26 @@ class Frame:
                 )
         else:
             # Load the image
-            if tifffile is None:
+            if imageio is None:
                 raise ModuleNotFoundError(
-                    "tifffile library not installed. "
-                    "Install csi-images with [imageio] option to resolve."
+                    "imageio libraries not installed! "
+                    "run `pip install csi_images[imageio]` to resolve."
                 )
-            image = tifffile.imread(file_path)
+            image = imageio.imread(file_path)
         if image is None or image.size == 0:
             raise ValueError(f"Could not load image from {file_path}")
-        if apply_gain and not self.scan.channels[self.channel].gain_applied:
-            image = image * self.scan.channels[self.channel].intensity
+        if apply_gain and not self.tile.scan.channels[self.channel].gain_applied:
+            image = image * self.tile.scan.channels[self.channel].intensity
         return image
 
     @staticmethod
     def _get_jpeg_image(input_path: str) -> np.ndarray:
-        if skimageio is None:
+        if imageio is None:
             raise ModuleNotFoundError(
-                "scikit-image library not installed. "
-                "Install csi-images with [imageio] option to resolve."
+                "imageio libraries not installed! "
+                "run `pip install csi_images[imageio]` to resolve."
             )
-        image = skimageio.imread(input_path)
+        image = imageio.imread(input_path)
         if os.path.isfile(os.path.splitext(input_path)[0] + ".tags"):
             min_name = "PreservedMinValue"
             max_name = "PreservedMaxValue"
@@ -236,7 +233,7 @@ class Frame:
 
         frames = []
         for channel in channels:
-            frames.append(Frame(tile.scan, tile, channel))
+            frames.append(Frame(tile, channel))
         return frames
 
     @classmethod
@@ -286,15 +283,15 @@ class Frame:
         """
         if csi_images is None:
             raise ModuleNotFoundError(
-                "csi-images library not installed. "
-                "Install csi-images with [imageio] option to resolve."
+                "imageio libraries not installed! "
+                "run `pip install csi_images[imageio]` to resolve."
             )
         images = []
         colors = []
         for channel_index, color in channels.items():
             if channel_index == -1:
                 continue
-            image = Frame(tile.scan, tile, channel_index).get_image(input_path)
+            image = Frame(tile, channel_index).get_image(input_path)
             images.append(image)
             colors.append(color)
         return csi_images.make_rgb(images, colors)
