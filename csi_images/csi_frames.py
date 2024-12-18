@@ -38,6 +38,12 @@ class Frame:
         else:
             raise ValueError("Channel must be an integer or a string.")
 
+    def __key(self) -> tuple:
+        return self.tile, self.channel
+
+    def __hash__(self) -> int:
+        return hash(self.__key())
+
     def __repr__(self) -> str:
         return f"{self.tile}-{self.tile.scan.channels[self.channel].name}"
 

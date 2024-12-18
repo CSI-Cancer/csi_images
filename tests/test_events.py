@@ -312,54 +312,6 @@ def test_event_montages():
     event = Event(scan, tile, 515, 411)
     images = event.get_crops(crop_size=100)
 
-    # # Test different montages
-    # montage = csi_images.make_montage(images, [0, 1, 2, 3])
-    # montage_shape = csi_images.get_montage_shape(images[0].shape, 4)
-    # assert montage.shape == montage_shape
-    #
-    # if SHOW_PLOTS:
-    #     cv2.imshow("Horizontal montage with all channels", montage)
-    #     cv2.waitKey(0)
-    #     cv2.destroyAllWindows()
-    #
-    # montage = csi_images.make_montage(images, [0, 2])
-    # if SHOW_PLOTS:
-    #     cv2.imshow("Horizontal montage with DAPI, CD45", montage)
-    #     cv2.waitKey(0)
-    #     cv2.destroyAllWindows()
-    #
-    # montage = csi_images.make_montage(images, [0, 2], horizontal=False)
-    # if SHOW_PLOTS:
-    #     cv2.imshow("Vertical montage with DAPI, CD45", montage)
-    #     cv2.waitKey(0)
-    #     cv2.destroyAllWindows()
-    #
-    # montage = csi_images.make_montage(
-    #     images,
-    #     [0, 2],
-    #     {0: (0, 0, 1), 2: (0, 1, 0)},
-    # )
-    # if SHOW_PLOTS:
-    #     cv2.imshow(
-    #         "Horizontal montage with DAPI+CD45, DAPI, CD45",
-    #         cv2.cvtColor(montage, cv2.COLOR_RGB2BGR),
-    #     )
-    #     cv2.waitKey(0)
-    #     cv2.destroyAllWindows()
-    #
-    # montage = csi_images.make_montage(
-    #     images,
-    #     [0, 1, 3, 2],
-    #     {0: (0, 0, 1), 1: (1, 0, 0), 2: (0, 1, 0), 3: (1, 1, 1)},
-    # )
-    # if SHOW_PLOTS:
-    #     cv2.imshow(
-    #         "Full, classic montage",
-    #         cv2.cvtColor(montage, cv2.COLOR_RGB2BGR),
-    #     )
-    #     cv2.waitKey(0)
-    #     cv2.destroyAllWindows()
-
     montage = csi_images.make_montage(
         images,
         [0, 1, 3, 2],
@@ -373,3 +325,56 @@ def test_event_montages():
         )
         cv2.waitKey(0)
         cv2.destroyAllWindows()
+
+
+def test_saving_crops_and_montages():
+    scan = Scan.load_txt("tests/data")
+    tile = Tile(scan, 1000)
+    tile2 = Tile(scan, 0)
+    events = [
+        Event(scan, tile, 515, 411),
+        Event(scan, tile2, 2, 1000),
+        Event(scan, tile, 1000, 1000),
+        Event(scan, tile2, 800, 800),
+        Event(scan, tile, 1000, 662),
+    ]
+
+    # Get all crops and montages
+    serial_crops = []
+    serial_montages = []
+    for event in events:
+        serial_crops.append(event.get_crops())
+        serial_montages.append(event.get_montage())
+
+    # Save crops and montages
+    Event.get_and_save_many_crops(events, "temp", scan.get_channel_names())
+    Event.get_and_save_many_montages(events, "temp")
+
+    saved_crops = []
+    saved_montages = []
+    for event in events:
+        crops = event.load_crops("temp")
+        saved_crops.append([crops[c] for c in scan.get_channel_names()])
+        saved_montages.append(event.load_montage("temp"))
+
+    # Make sure crops are identical
+    for a, b in zip(serial_crops, saved_crops):
+        for a_img, b_img in zip(a, b):
+            assert np.array_equal(a_img, b_img)
+
+    # Montages got JPEG compressed, so
+    # Size comparison:
+    for a, b in zip(serial_montages, saved_montages):
+        assert a.shape == b.shape
+
+    # Visual inspection
+    if SHOW_PLOTS:
+        cv2.imshow("Original", cv2.cvtColor(serial_montages[0], cv2.COLOR_RGB2BGR))
+        cv2.imshow("Saved", cv2.cvtColor(saved_montages[0], cv2.COLOR_RGB2BGR))
+        cv2.waitKey(0)
+        cv2.destroyAllWindows()
+
+    # Clean up
+    for file in os.listdir("temp"):
+        os.remove(os.path.join("temp", file))
+    os.rmdir("temp")

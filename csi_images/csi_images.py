@@ -109,8 +109,8 @@ def make_rgb(
 
 def make_montage(
     images: list[np.ndarray],
-    order: list[int] = None,
-    composites: dict[int, tuple[float, float, float]] = None,
+    order: list[int] | None,
+    composites: dict[int, tuple[float, float, float]] | None,
     labels: list[str] = None,
     label_font: str = "Roboto-Regular.ttf",
     label_size: int | float = 0.18,
@@ -124,8 +124,8 @@ def make_montage(
     Combine multiple images into a single montage based on order.
     Can include a composite (always first).
     :param images: list of numpy arrays representing the images.
-    :param order: list of indices for the images going into the montage.
-    :param composites: dictionary of indices and RGB tuples for a composite.
+    :param order: list of indices for the images going into the montage or None.
+    :param composites: dictionary of indices and RGB tuples for a composite or None.
     :param labels: list of labels for the images. If length == len(order), will apply to
     grayscale images only; if length == len(order) + 1 and composites exist, will apply
     to all images.

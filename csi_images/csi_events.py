@@ -9,6 +9,7 @@ csi_utils.csi_scans documentation page for more information on the coordinate sy
 """
 
 import os
+import glob
 import math
 import warnings
 from typing import Self, Iterable, Hashable, Sequence
@@ -226,8 +227,8 @@ class Event:
     def save_crops(
         self,
         crops: Sequence[np.ndarray],
+        output_path: str,
         labels: Sequence[str],
-        output_path,
         ext: str = "auto",
     ):
         """
@@ -236,7 +237,7 @@ class Event:
         grayscale if 1 channel [h, w] or [h, w, 1].
         :param labels: the labels to append to the file name, usually the channel names
         associated with each crop.
-        :param output_path: the folder to save the crops to.
+        :param output_path: the folder to save the crops to. Will make if needed.
         :param ext: the file extension to save the crops as. Defaults to "auto", which
         will save as .tif for grayscale images and .jpg for RGB images.
         :return: None
@@ -249,6 +250,8 @@ class Event:
                 "imageio libraries not installed! "
                 "run `pip install csi_images[imageio]` to resolve."
             )
+
+        os.makedirs(output_path, exist_ok=True)
 
         for crop, label in zip(crops, labels):
             if ext == "auto":
@@ -273,68 +276,60 @@ class Event:
             else:
                 imageio.imwrite(file, crop)
 
+    def load_crops(
+        self, input_path: str, labels: list[str] = None
+    ) -> dict[str, np.ndarray]:
+        """
+        Loads previously saved crop files from a folder.
+        :param input_path: folder containing crop files.
+        :param labels: optional label filter, will only return crops with these labels.
+        :return: a tuple of lists containing the crops and their labels.
+        """
+        crops = {}
+        for file in glob.glob(os.path.join(input_path, f"{self}-*")):
+            label = os.path.splitext(os.path.basename(file))[0].split("-")[-1]
+            # Skip if we have labels to target
+            if labels is not None and label not in labels:
+                continue
+            crops[label] = imageio.imread(file)
+        return crops
+
     def get_montage(
         self,
+        channels: Iterable[int | str] = None,
+        composites: dict[int | str, tuple[float, float, float]] = None,
         crop_size: int = 100,
         in_pixels: bool = True,
         input_path: str = None,
-        channels: Iterable[int | str] = None,
         apply_gain: bool | Iterable[bool] = True,
-        composites: dict[int | str, tuple[float, float, float]] = None,
-        labels: list[str] = None,
-        label_font: str = "Roboto-Regular.ttf",
-        label_size: int | float = 0.18,
-        label_outline: bool = True,
-        colored_labels: bool = True,
-        border_size: int = 1,
-        horizontal: bool = True,
-        dtype=np.uint8,
+        **kwargs,
     ) -> np.ndarray:
         """
         Convenience function for getting frame images and creating a montage. Mirrors
         csi_images.make_montage(). Convenient for a single event's montage, but less
         efficient when for multiple events from the same tile.
+        :param channels: the channels to extract images for. Defaults to all channels.
+        :param composites: dictionary of indices and RGB tuples for a composite.
         :param crop_size: the square size of the image crop to get for this event.
         :param in_pixels: whether the crop size is in pixels or micrometers. Defaults to pixels.
         :param input_path: the path to the input images. Defaults to None (uses the scan's path).
-        :param channels: the channels to extract images for. Defaults to all channels.
         :param apply_gain: whether to apply scanner-calculated gain to the images, if
         not already applied. If a list, matches the channels.
-        :param composites: dictionary of indices and RGB tuples for a composite.
-        :param labels: list of labels for the images. If length == len(order), will apply to
-        grayscale images only; if length == len(order) + 1 and composites exist, will apply
-        to all images.
-        :param label_font: path to a font file for labels. See PIL.ImageFont for details.
-        :param label_size: size of the font for labels. If a float, calculates a font size
-        as a fraction of the image size.
-        :param label_outline: whether to draw an outline around the label text.
-        :param colored_labels: whether to color the labels based on the composites.
-        :param border_size: width of the border between images.
-        :param horizontal: whether to stack images horizontally or vertically.
-        :param dtype: the dtype of the output montage.
+        :param kwargs: montage options. See csi_images.make_montage() for more details.
         :return: numpy array representing the montage.
         """
         images = self.get_crops(crop_size, in_pixels, input_path, channels, apply_gain)
         order = [f.channel for f in Frame.get_frames(self.tile, channels)]
-        # Correct the composites dict to match the channel indices
-        corrected_composites = {}
-        for key, value in composites.items():
-            if isinstance(key, str):
-                key = Frame(self.tile, key).channel
-            corrected_composites[key] = value
-        return csi_images.make_montage(
-            images,
-            order,
-            corrected_composites,
-            labels,
-            label_font,
-            label_size,
-            label_outline,
-            colored_labels,
-            border_size,
-            horizontal,
-            dtype,
-        )
+        # Make the composites dict to match the channel indices
+        if composites is None:
+            idx_composites = None
+        else:
+            idx_composites = {}
+            for key, value in composites.items():
+                if isinstance(key, str):
+                    key = Frame(self.tile, key).channel
+                idx_composites[key] = value
+        return csi_images.make_montage(images, order, idx_composites, **kwargs)
 
     def save_montage(
         self,
@@ -346,7 +341,7 @@ class Event:
         """
         Save the montage as a JPEG image with a set name.
         :param montage: the montage to save.
-        :param output_path: the path to save the montage to.
+        :param output_path: the folder to save the montage in. Wil make if needed.
         :param ocular_names: whether to use the OCULAR naming convention.
         :param tag: a tag to append to the file name. Ignored if ocular_names is True.
         :return: None
@@ -368,13 +363,24 @@ class Event:
         else:
             file = f"{self}{tag}.jpeg"
 
-        imageio.imwrite(os.path.join(output_path, file), montage)
+        os.makedirs(output_path, exist_ok=True)
+        imageio.imwrite(os.path.join(output_path, file), montage, quality=80)
+
+    def load_montage(self, input_path: str, tag: str = "") -> np.ndarray:
+        """
+        Loads the montage from a file saved by Event.save_montage.
+        :param input_path: the path to the folder where the montage was saved.
+        :param tag: a string to add to the file name, before the extension.
+        :return:
+        """
+        file = f"{self}{tag}.jpeg"
+        return imageio.imread(os.path.join(input_path, file))
 
     @classmethod
     def get_many_crops(
         cls,
         events: Sequence[Self],
-        crop_size: int | Sequence[int] = 75,
+        crop_size: int | Sequence[int] = 100,
         in_pixels: bool = True,
         input_path: str | Sequence[str] = None,
         channels: Sequence[int | str] = None,
@@ -427,71 +433,139 @@ class Event:
         return crops
 
     @classmethod
+    def get_many_montages(
+        cls,
+        events: Sequence[Self],
+        channels: Iterable[int | str] = None,
+        composites: dict[int | str, tuple[float, float, float]] = None,
+        crop_size: int = 100,
+        in_pixels: bool = True,
+        input_path: str = None,
+        apply_gain: bool | Iterable[bool] = True,
+        **kwargs,
+    ) -> list[np.ndarray]:
+        """
+        Convenience function for get_montage(), but for a list of events. More efficient
+        thank get_montage() when working with multiple events from the same tile.
+        :param events: a list of Event objects.
+        :param channels: the channels to extract images for. Defaults to all channels.
+        :param composites: dictionary of indices and RGB tuples for a composite.
+        :param crop_size: the square size of the image crop to get for this event.
+        :param in_pixels: whether the crop size is in pixels or micrometers. Defaults to pixels.
+        :param input_path: the path to the input images. Defaults to None (uses the scan's path).
+        :param apply_gain: whether to apply scanner-calculated gain to the images, if
+        not already applied. If a list, matches the channels.
+        :param kwargs: montage options. See csi_images.make_montage() for more details.
+        :return: a list of numpy arrays representing the montages.
+        """
+        if len(events) == 0:
+            return []
+        # Adapt singular inputs to lists of appropriate length
+        if isinstance(crop_size, int):
+            crop_size = [crop_size] * len(events)
+        if input_path is None or isinstance(input_path, str):
+            input_path = [input_path] * len(events)
+
+        # Get the order of the events when sorted by slide/tile
+        order, _ = zip(*sorted(enumerate(events), key=lambda x: x[1].__repr__()))
+
+        # Allocate the list to size
+        montages = [None] * len(events)
+        last_tile = None
+        images = None  # Holds large numpy arrays, so expensive to compare
+        montage_order = None
+        idx_composites = None
+
+        # Iterate through in slide/tile sorted order
+        for i in order:
+            if last_tile != events[i].tile:
+                # Gather the frame images, preserving them for the next event
+                frames = Frame.get_frames(events[i].tile, channels)
+                if isinstance(apply_gain, bool):
+                    apply = [apply_gain] * len(frames)
+                else:
+                    apply = apply_gain
+                images = [f.get_image(input_path[i], a) for f, a in zip(frames, apply)]
+                # Get the montage and composite order (just in case)
+                montage_order = [f.channel for f in frames]
+                if composites is None:
+                    idx_composites = None
+                else:
+                    idx_composites = {}
+                    for key, value in composites.items():
+                        if isinstance(key, str):
+                            key = Frame(events[i].tile, key).channel
+                        idx_composites[key] = value
+                last_tile = events[i].tile
+            # Use the frame images to crop the event images and make montages
+            crops = events[i].crop(images, crop_size[i], in_pixels)
+            montages[i] = csi_images.make_montage(
+                crops, montage_order, idx_composites, **kwargs
+            )
+
+        return montages
+
+    @classmethod
     def get_and_save_many_crops(
         cls,
         events: list[Self],
         output_path: str,
-        crops: list[list[np.ndarray]] = None,
-        crop_size: int | list[int] = 100,
-        in_pixels: bool = True,
-        input_path: str | Iterable[str] = None,
-        channels: Iterable[int | str] = None,
-        apply_gain: bool | Iterable[bool] = True,
-        additional_gain: Iterable[float] = None,
+        labels: Sequence[str],
+        ext: str = "auto",
+        additional_gain: Sequence[float] = None,
+        **kwargs,
     ) -> None:
         """
         Get and save the crops for a list of events, ensuring that there is no wasteful
         reading and limiting the image data in memory to 1 tile at a time. This function
         is more efficient that chaining get_crops() and save_crops() for each event or
         get_many_crops() and then save_crops().
-        :param output_path: the path to save the crops to.
-        :param crops: the crops to save. If None, crops will be extracted. If not None,
-        crop_size, in_pixels, input_path, apply_gain, and additional_gain are ignored.
-        :param crop_size: the square size of the image crop to get for this event.
-        :param in_pixels: whether the crop size is in pixels or micrometers.
-        :param kwargs: additional keyword arguments to pass to
-        extract_images_for_list().
-        :param input_path: the path to the input images. Will only work for lists of events
+        :param events: list of events to get, crop, and save.
+        :param output_path: the folder to save the crops in. Will make if needed.
+        :param labels: the labels to save the crops with. See save_crops().
+        :param ext: the file extension to save the crops as. See save_crops().
+        :param additional_gain: additional gain to apply to the crops. If not None, must
+        match the length of the number of crop channels.
+        :param kwargs: see get_many_crops() for more parameters.
+        :return:
         """
-        raise NotImplementedError("This function is not yet implemented.")
-        # unique_tiles = set([event.tile for event in events])
-        #
-        # for tile in unique_tiles:
-        #     tile_events = [event for event in events if event.tile == tile]
-        #     crops_list = cls.get_many_crops(tile_events, crop_size, in_pixels, input_path, channels, apply_gain)
-        #     for event, crops in zip(tile_events, crops_list):
-        #         for crop, channel in zip(crop_list, channels):
-        #             file = os.path.join(
-        #                 output_path, f"{event}-{channel}{file_extension}"
-        #             )
-        #             if file_extension == ".tif":
-        #                 tifffile.imsave(file, crop)
-        #             else:
-        #                 skimage.io.imsave(file, crop)
+        unique_tiles = set([event.tile for event in events])
+
+        for tile in unique_tiles:
+            # Get one tile's worth of event crops
+            tile_events = [e for e in events if e.tile == tile]
+            crops_list = cls.get_many_crops(tile_events, **kwargs)
+            for event, crops in zip(tile_events, crops_list):
+                # Apply any additional gains
+                if additional_gain is not None:
+                    crops = [gain * crop for gain, crop in zip(additional_gain, crops)]
+                event.save_crops(crops, output_path, labels, ext)
 
     @classmethod
-    def get_and_save_montages(
-        cls, events: list[Self], output_path: str, **kwargs
+    def get_and_save_many_montages(
+        cls,
+        events: list[Self],
+        output_path: str,
+        ocular_names: bool = False,
+        tag: str = "",
+        **kwargs,
     ) -> None:
         """
         Save montages of the events to image files.
-        :param events: the events to save as a montage.
-        :param output_path: the folder to save the montages to.
-        :param kwargs: additional keyword arguments to pass to
-        extract_images_for_list() and csi_images.make_montage().
+        :param events: the events to get, montage, and save.
+        :param output_path: the folder to save the montages to. Will make if needed.
+        :param ocular_names: whether to use the OCULAR naming convention.
+        :param tag: a tag to append to the file name. Ignored if ocular_names is True.
+        :param kwargs: see get_many_montages() for more parameters.
         """
-        raise NotImplementedError("This function is not yet implemented.")
-        # unique_tiles = set([event.tile for event in events])
-        # for tile in unique_tiles:
-        #     tile_events = [event for event in events if event.tile == tile]
-        #     crops = cls.extract_images_for_list(tile_events, **kwargs)
-        #     montages = make_montage(crops)
-        #     for event, montage in zip(tile_events, montages):
-        #         file = os.path.join(output_path, f"{event}{file_extension}")
-        #         if file_extension == ".tif":
-        #             tifffile.imsave(file, montage)
-        #         else:
-        #             skimage.io.imsave(file, montage)
+        unique_tiles = set([event.tile for event in events])
+
+        for tile in unique_tiles:
+            # Get one tile's worth of event crops
+            tile_events = [e for e in events if e.tile == tile]
+            montages = cls.get_many_montages(tile_events, **kwargs)
+            for event, montage in zip(tile_events, montages):
+                event.save_montage(montage, output_path, ocular_names, tag)
 
 
 class EventArray:

@@ -168,6 +168,30 @@ class Scan(yaml.YAMLObject):
         self.channels = channels
         self.roi = roi
 
+    def __key(self):
+        return (
+            self.slide_id,
+            self.exists,
+            self.path,
+            self.start_date,
+            self.end_date,
+            self.scan_time_s,
+            self.scanner_id,
+            self.tray_pos,
+            self.slide_pos,
+            self.camera,
+            self.objective,
+            self.pixel_size_um,
+            self.tile_width_px,
+            self.tile_height_px,
+            self.tile_overlap_proportion,
+            tuple(self.channels),
+            tuple(self.roi),
+        )
+
+    def __hash__(self):
+        return hash(self.__key())
+
     def __repr__(self):
         return yaml.dump(self, sort_keys=False)
 

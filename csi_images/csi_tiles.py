@@ -59,6 +59,12 @@ class Tile:
                 "Coordinates must be an integer n or a tuple of (x, y) coordinates."
             )
 
+    def __key(self) -> tuple:
+        return self.scan.slide_id, self.n_roi, self.n
+
+    def __hash__(self) -> int:
+        return hash(self.__key())
+
     def __repr__(self) -> str:
         return f"{self.scan.slide_id}-{self.n_roi}-{self.n}"
 

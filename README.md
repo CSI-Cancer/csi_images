@@ -12,13 +12,13 @@ Other packages in the CSI-Cancer organization may depend on this package.
 
 Install with:
 
-```commandline
+```bash
 pip install csi_images
 ```
 
 or
 
-```commandline
+```bash
 pip install csi_images[imageio,rds,dev,all]
 ```
 
@@ -73,14 +73,14 @@ This package contains these modules:
 For more detailed documentation, check
 [the API docs](https://csi-cancer.github.io/csi_images/).
 
-Alternatively, once you have cloned the repository, you
-can open up `docs/index.html` in your browser.
+Alternatively, once you have cloned the repository, you can open up `docs/index.html` in
+your browser.
 
-To regenerate the documentation, ensure that you
-have [installed the package](#installation) and then run:
+To regenerate the documentation, ensure that you have installed the package with
+development dependencies and then run:
 
-```commandline
-make_docs_for_csi_images
+```bash
+docs/make_docs.sh
 ```
 
 ## Development Installation
@@ -89,7 +89,7 @@ make_docs_for_csi_images
    `venv` (`source path/to/your/venv/bin/activate`) environment first.
 2. Clone `csi_images` and install:
 
-```commandline
+```bash
 cd ~/path/to/your/repositories
 git clone git@github.com:CSI-Cancer/csi_images.git
 pip install ./csi_images
@@ -98,7 +98,7 @@ pip install ./csi_images
 Alternatively, you can "editable" install the package, which will allow you to make
 changes to the package and have them reflected in your environment without reinstalling:
 
-```commandline
+```bash
 pip install -e ./csi_images
 ```
 
