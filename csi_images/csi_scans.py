@@ -379,25 +379,35 @@ class Scan(yaml.YAMLObject):
             objective=scan_dict["objective"],
             pixel_size_um=scan_dict["pixel_size"],
         )
-        for channel_json in json.loads(scan_dict["channels"])["data"]:
+        # Handle JSON and dictionaries
+        if isinstance(scan_dict["channels"], str):
+            channels_dict = json.loads(scan_dict["channels"])["data"]
+        else:
+            channels_dict = scan_dict["channels"]["data"]
+        for channel in channels_dict:
             result.channels.append(
                 cls.Channel(
-                    name=channel_json["name"],
-                    exposure_ms=channel_json["exposure_ms"],
-                    intensity=channel_json["intensity"],
-                    gain_applied=channel_json["gain_applied"],
+                    name=channel["name"],
+                    exposure_ms=channel["exposure_ms"],
+                    intensity=channel["intensity"],
+                    gain_applied=channel["gain_applied"],
                 )
             )
-        for roi_json in json.loads(scan_dict["roi"])["data"]:
+        # Handle JSON and dictionaries
+        if isinstance(scan_dict["channels"], str):
+            roi_dict = json.loads(scan_dict["roi"])["data"]
+        else:
+            roi_dict = scan_dict["roi"]["data"]
+        for roi in roi_dict:
             result.roi.append(
                 cls.ROI(
-                    origin_x_um=roi_json["origin_x_um"],
-                    origin_y_um=roi_json["origin_y_um"],
-                    width_um=roi_json["width_um"],
-                    height_um=roi_json["height_um"],
-                    tile_rows=roi_json["tile_rows"],
-                    tile_cols=roi_json["tile_cols"],
-                    focus_points=roi_json["focus_points"],
+                    origin_x_um=roi["origin_x_um"],
+                    origin_y_um=roi["origin_y_um"],
+                    width_um=roi["width_um"],
+                    height_um=roi["height_um"],
+                    tile_rows=roi["tile_rows"],
+                    tile_cols=roi["tile_cols"],
+                    focus_points=roi["focus_points"],
                 )
             )
         return result
