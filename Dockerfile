@@ -22,10 +22,7 @@ RUN python -m venv /venv
 ENV PATH=/venv/bin:$PATH
 
 # Copy over package and install
-COPY $PACKAGE_NAME /$PACKAGE_NAME/$PACKAGE_NAME
-COPY examples /$PACKAGE_NAME/examples
-COPY tests /$PACKAGE_NAME/tests
-COPY pyproject.toml requirements.txt README.md /$PACKAGE_NAME/
+COPY ./ ./
 RUN pip install .
 
-ENTRYPOINT [ "bash" ]
+ENTRYPOINT ["bash"]

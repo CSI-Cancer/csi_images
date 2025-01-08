@@ -6,6 +6,7 @@ tables
 PyYAML
 aicspylibczi
 tifffile[codecs]
+imageio
 scikit-image
 opencv-python
 Pillow

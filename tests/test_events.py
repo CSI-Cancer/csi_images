@@ -1,6 +1,8 @@
 import os
 import time
 
+import pytest
+
 import cv2
 import numpy as np
 import pandas as pd
@@ -17,22 +19,27 @@ else:
     SHOW_PLOTS = True
 
 
-def test_getting_event():
-    scan = Scan.load_txt("tests/data")
-    tile = Tile(scan, 0)
-    event = Event(
-        scan,
-        tile,
-        516,
-        278,
-    )
-    # Test getting images
+@pytest.fixture
+def bzscan():
+    return Scan.load_txt("tests/data")
+
+
+@pytest.fixture
+def axscan():
+    return Scan.load_yaml("tests/data")
+
+
+def test_get_crops(bzscan):
+    tile = Tile(bzscan, 1000)
+    event = Event(tile, 400, 350)
+
+    # Test a regular event
     images = event.get_crops()
-    assert len(images) == 4
-    images = event.get_crops(crop_size=100)
-    assert images[0].shape == (100, 100)
+    assert len(images) == 5
     images = event.get_crops(crop_size=50)
     assert images[0].shape == (50, 50)
+    images = event.get_crops(crop_size=100)
+    assert images[0].shape == (100, 100)
 
     if SHOW_PLOTS:
         for image in images:
@@ -41,18 +48,13 @@ def test_getting_event():
         cv2.destroyAllWindows()
 
     # Test a corner event
-    event = Event(
-        scan,
-        tile,
-        1346,
-        9,
-    )
+    event = Event(tile, 1350, 2)
     images = event.get_crops()
-    assert len(images) == 4
-    images = event.get_crops(crop_size=100)
-    assert images[0].shape == (100, 100)
+    assert len(images) == 5
     images = event.get_crops(crop_size=200)
     assert images[0].shape == (200, 200)
+    images = event.get_crops(crop_size=100)
+    assert images[0].shape == (100, 100)
 
     if SHOW_PLOTS:
         for image in images:
@@ -60,20 +62,18 @@ def test_getting_event():
             cv2.waitKey(0)
         cv2.destroyAllWindows()
 
-
-def test_getting_many_events():
-    scan = Scan.load_txt("tests/data")
-    tile = Tile(scan, 1000)
-    tile2 = Tile(scan, 0)
+    # Test many events
+    tile2 = Tile(bzscan, 500)
     events = [
-        Event(scan, tile, 515, 411),
-        Event(scan, tile2, 2, 1000),
-        Event(scan, tile, 1000, 1000),
-        Event(scan, tile, 87, 126),
-        Event(scan, tile, 1000, 2),
-        Event(scan, tile2, 800, 800),
-        Event(scan, tile, 1000, 662),
+        Event(tile, 515, 411),
+        Event(tile2, 2, 1000),
+        Event(tile, 1000, 1000),
+        Event(tile, 87, 126),
+        Event(tile, 1000, 2),
+        Event(tile2, 800, 800),
+        Event(tile, 1000, 662),
     ]
+
     # Test time to extract images sequentially
     start_time = time.time()
     images_1 = []
@@ -94,7 +94,7 @@ def test_getting_many_events():
     # Test that it works after converting to EventArray and back
     event_array = EventArray.from_events(events)
     remade_events = event_array.to_events(
-        [scan], ignore_metadata=True, ignore_features=True
+        [bzscan], ignore_metadata=True, ignore_features=True
     )
     images_3 = Event.get_many_crops(remade_events, crop_size=100)
     for list_a, list_b in zip(images_1, images_3):
@@ -103,29 +103,36 @@ def test_getting_many_events():
             assert np.array_equal(image_a, image_b)
 
 
-def test_event_coordinates_for_bzscanner():
-    scan = Scan.load_txt("tests/data")
+def test_event_coordinates_for_bzscanner(bzscan):
     # Origin
-    tile = Tile(scan, 0)
-    event = Event(scan, tile, 0, 0)
+    tile = Tile(bzscan, 0)
+    event = Event(tile, 0, 0)
     scan_origin = event.get_scan_position()
     assert 2500 <= scan_origin[0] <= 3500
     assert 2500 <= scan_origin[1] <= 3500
     scan_origin_on_slide = event.get_slide_position()
     assert 71500 <= scan_origin_on_slide[0] <= 72500
     assert 21500 <= scan_origin_on_slide[1] <= 22500
-    # Within the same tile, "bottom-right corner"
-    event = Event(scan, tile, 1000, 1000)
+    # Within the same tile, "top-right corner"
+    event = Event(tile, 1000, 0)
     scan_position = event.get_scan_position()
-    assert scan_origin[0] <= scan_position[0]
-    assert scan_origin[1] <= scan_position[1]
+    assert scan_origin[0] < scan_position[0]
+    assert scan_origin[1] == scan_position[1]
     slide_position = event.get_slide_position()
-    assert slide_position[0] <= scan_origin_on_slide[0]
-    assert slide_position[1] <= scan_origin_on_slide[1]
+    assert scan_origin_on_slide[0] == slide_position[0]
+    assert scan_origin_on_slide[1] > slide_position[1]
+    # Within the same tile, "bottom-left corner"
+    event = Event(tile, 0, 1000)
+    scan_position = event.get_scan_position()
+    assert scan_origin[0] == scan_position[0]
+    assert scan_origin[1] < scan_position[1]
+    slide_position = event.get_slide_position()
+    assert scan_origin_on_slide[0] > slide_position[0]
+    assert scan_origin_on_slide[1] == slide_position[1]
 
     # Next row, opposite side
-    tile = Tile(scan, (scan.roi[0].tile_cols - 1, 1))
-    event = Event(scan, tile, 1000, 1000)
+    tile = Tile(bzscan, (bzscan.roi[0].tile_cols - 1, 1))
+    event = Event(tile, 1000, 1000)
     scan_position = event.get_scan_position()
     assert scan_origin[0] <= scan_position[0]
     assert scan_origin[1] <= scan_position[1]
@@ -134,8 +141,8 @@ def test_event_coordinates_for_bzscanner():
     assert slide_position[1] <= scan_origin_on_slide[1]
 
     # Opposite corner
-    tile = Tile(scan, (scan.roi[0].tile_cols - 1, scan.roi[0].tile_rows - 1))
-    event = Event(scan, tile, 1361, 1003)
+    tile = Tile(bzscan, (bzscan.roi[0].tile_cols - 1, bzscan.roi[0].tile_rows - 1))
+    event = Event(tile, 1361, 1003)
     scan_position = event.get_scan_position()
     assert 21500 <= scan_position[0] <= 22500
     assert 58500 <= scan_position[1] <= 60500
@@ -144,11 +151,10 @@ def test_event_coordinates_for_bzscanner():
     assert 2500 <= slide_position[1] <= 3500
 
 
-def test_event_coordinates_for_axioscan():
-    scan = Scan.load_yaml("tests/data")
+def test_event_coordinates_for_axioscan(axscan):
     # Origin
-    tile = Tile(scan, 0)
-    event = Event(scan, tile, 0, 0)
+    tile = Tile(axscan, 0)
+    event = Event(tile, 0, 0)
     scan_position = event.get_scan_position()
     assert -59000 <= scan_position[0] < -55000
     assert 0 <= scan_position[1] < 4000
@@ -157,8 +163,8 @@ def test_event_coordinates_for_axioscan():
     assert scan_position[1] == slide_position[1]
 
     # Opposite corner
-    tile = Tile(scan, (scan.roi[0].tile_cols - 1, scan.roi[0].tile_rows - 1))
-    event = Event(scan, tile, 2000, 2000)
+    tile = Tile(axscan, (axscan.roi[0].tile_cols - 1, axscan.roi[0].tile_rows - 1))
+    event = Event(tile, 2000, 2000)
     scan_position = event.get_scan_position()
     assert -4000 <= scan_position[0] <= 0
     assert 21000 <= scan_position[1] <= 25000
@@ -167,13 +173,12 @@ def test_event_coordinates_for_axioscan():
     assert scan_position[1] == slide_position[1]
 
 
-def test_eventarray_conversions():
-    scan = Scan.load_yaml("tests/data")
+def test_eventarray_conversions(axscan):
     # Origin
-    tile = Tile(scan, 0)
-    event0 = Event(scan, tile, 0, 0)
-    event1 = Event(scan, tile, 1000, 1000)
-    event2 = Event(scan, tile, 2000, 2000)
+    tile = Tile(axscan, 0)
+    event0 = Event(tile, 0, 0)
+    event1 = Event(tile, 1000, 1000)
+    event2 = Event(tile, 2000, 2000)
 
     event_array = EventArray.from_events([event0, event1, event2])
 
@@ -207,7 +212,7 @@ def test_eventarray_conversions():
     event_array.features = pd.DataFrame(
         {"feature1": [1, 2, 3], "feature2": [4.0, 5.0, 6.0]}
     )
-    remade_event_list = event_array.to_events([scan])
+    remade_event_list = event_array.to_events([axscan])
     assert len(remade_event_list) == 3
     remade_event_array = EventArray.from_events(remade_event_list)
     assert event_array == remade_event_array
@@ -221,9 +226,9 @@ def test_eventarray_conversions():
     os.remove("tests/data/events.h5")
 
 
+# @pytest.mark.skip(reason="No longer required.")
 def test_ocular_conversions():
-    scan = Scan.load_txt("tests/data")
-    input_path = "/mnt/HDSCA_Development/DZ/0B58703/ocular"
+    input_path = "/mnt/HDSCA_Development/DZ/0B68818/ocular"
     result = EventArray.load_ocular(input_path)
     # For the purposes of this test, we will manually relabel "clust" == nan to 0
     # These come from ocular_interesting.rds, which does not have clusters
@@ -263,16 +268,15 @@ def test_ocular_conversions():
     os.remove("tests/data/others-final4.rds")
 
 
-def test_copy_sort_rows_get():
-    scan = Scan.load_yaml("tests/data")
+def test_copy_sort_rows_get(axscan):
     # Origin
-    tile = Tile(scan, 0)
+    tile = Tile(axscan, 0)
     events = [
-        Event(scan, tile, 0, 100),
-        Event(scan, tile, 0, 0),
-        Event(scan, tile, 1000, 1000),
-        Event(scan, tile, 1000, 1),
-        Event(scan, tile, 2000, 2000),
+        Event(tile, 0, 100),
+        Event(tile, 0, 0),
+        Event(tile, 1000, 1000),
+        Event(tile, 1000, 1),
+        Event(tile, 2000, 2000),
     ]
 
     events = EventArray.from_events(events)
@@ -306,16 +310,15 @@ def test_copy_sort_rows_get():
     assert events_get.info["y"].equals(pd.Series([2000, 0, 100], dtype=np.uint16))
 
 
-def test_event_montages():
-    scan = Scan.load_txt("tests/data")
-    tile = Tile(scan, 1000)
-    event = Event(scan, tile, 515, 411)
+def test_event_montages(bzscan):
+    tile = Tile(bzscan, 1000)
+    event = Event(tile, 515, 411)
     images = event.get_crops(crop_size=100)
 
     montage = csi_images.make_montage(
         images,
-        [0, 1, 3, 2],
-        {0: (0, 0, 1), 1: (1, 0, 0), 2: (0, 1, 0), 3: (1, 1, 1)},
+        [0, 1, 4, 2],
+        {0: (0, 0, 1), 1: (1, 0, 0), 2: (0, 1, 0), 4: (1, 1, 1)},
         labels=["RGB", "DAPI", "AF555", "AF488", "AF647"],
     )
     if SHOW_PLOTS:
@@ -327,16 +330,15 @@ def test_event_montages():
         cv2.destroyAllWindows()
 
 
-def test_saving_crops_and_montages():
-    scan = Scan.load_txt("tests/data")
-    tile = Tile(scan, 1000)
-    tile2 = Tile(scan, 0)
+def test_saving_crops_and_montages(bzscan):
+    tile = Tile(bzscan, 1000)
+    tile2 = Tile(bzscan, 0)
     events = [
-        Event(scan, tile, 515, 411),
-        Event(scan, tile2, 2, 1000),
-        Event(scan, tile, 1000, 1000),
-        Event(scan, tile2, 800, 800),
-        Event(scan, tile, 1000, 662),
+        Event(tile, 515, 411),
+        Event(tile2, 2, 1000),
+        Event(tile, 1000, 1000),
+        Event(tile2, 800, 800),
+        Event(tile, 1000, 662),
     ]
 
     # Get all crops and montages
@@ -347,14 +349,14 @@ def test_saving_crops_and_montages():
         serial_montages.append(event.get_montage())
 
     # Save crops and montages
-    Event.get_and_save_many_crops(events, "temp", scan.get_channel_names())
+    Event.get_and_save_many_crops(events, "temp", bzscan.get_channel_names())
     Event.get_and_save_many_montages(events, "temp")
 
     saved_crops = []
     saved_montages = []
     for event in events:
         crops = event.load_crops("temp")
-        saved_crops.append([crops[c] for c in scan.get_channel_names()])
+        saved_crops.append([crops[c] for c in bzscan.get_channel_names()])
         saved_montages.append(event.load_montage("temp"))
 
     # Make sure crops are identical

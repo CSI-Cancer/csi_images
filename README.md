@@ -63,10 +63,7 @@ This package contains these modules:
     * `EventArray`: a class for containing a list of events, holding their data in
       pandas dataframes. Contains functions converting back and forth from `Event`s and
       files. Recommend importing via `from csi_images.csi_events import EventArray`
-
-### Planned Features
-
-* `Event.montage()`: Combines crops for an event into side-by-side montages.
+5. `csi_images.py`: a module for image manipulation functions.
 
 ## Documentation
 

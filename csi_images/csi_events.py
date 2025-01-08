@@ -76,14 +76,12 @@ class Event:
 
     def __init__(
         self,
-        scan: Scan,
         tile: Tile,
         x: int,
         y: int,
         metadata: pd.Series = None,
         features: pd.Series = None,
     ):
-        self.scan = scan
         self.tile = tile
         self.x = int(x)
         self.y = int(y)
@@ -105,14 +103,15 @@ class Event:
         :return: the scan position of the event in micrometers (um).
         """
         # Get overall pixel position
-        pixel_x = self.x + (self.scan.tile_width_px * self.tile.x)
-        pixel_y = self.y + (self.scan.tile_height_px * self.tile.y)
+        real_tile_height, real_tile_width = self.tile.scan.get_image_size()
+        pixel_x = self.x + (real_tile_width * self.tile.x)
+        pixel_y = self.y + (real_tile_height * self.tile.y)
         # Convert to micrometers
-        x_um = pixel_x * self.scan.pixel_size_um
-        y_um = pixel_y * self.scan.pixel_size_um
+        x_um = pixel_x * self.tile.scan.pixel_size_um
+        y_um = pixel_y * self.tile.scan.pixel_size_um
         # Add the scan's origin in the scanner frame
-        x_um += self.scan.roi[self.tile.n_roi].origin_x_um
-        y_um += self.scan.roi[self.tile.n_roi].origin_y_um
+        x_um += self.tile.scan.roi[self.tile.n_roi].origin_x_um
+        y_um += self.tile.scan.roi[self.tile.n_roi].origin_y_um
         return x_um, y_um
 
     def get_slide_position(self) -> tuple[float, float]:
@@ -125,12 +124,12 @@ class Event:
         scan_position = np.array([[scan_position[0]], [scan_position[1]], [1]])
 
         # Multiply by the appropriate homogeneous matrix
-        if self.scan.scanner_id.startswith(self.scan.Type.AXIOSCAN7.value):
-            transform = self.SCAN_TO_SLIDE_TRANSFORM[self.scan.Type.AXIOSCAN7]
-        elif self.scan.scanner_id.startswith(self.scan.Type.BZSCANNER.value):
-            transform = self.SCAN_TO_SLIDE_TRANSFORM[self.scan.Type.BZSCANNER]
+        if self.tile.scan.scanner_id.startswith(self.tile.scan.Type.AXIOSCAN7.value):
+            transform = self.SCAN_TO_SLIDE_TRANSFORM[self.tile.scan.Type.AXIOSCAN7]
+        elif self.tile.scan.scanner_id.startswith(self.tile.scan.Type.BZSCANNER.value):
+            transform = self.SCAN_TO_SLIDE_TRANSFORM[self.tile.scan.Type.BZSCANNER]
         else:
-            raise ValueError(f"Scanner type {self.scan.scanner_id} not supported.")
+            raise ValueError(f"Scanner type {self.tile.scan.scanner_id} not supported.")
         slide_position = np.matmul(transform, scan_position)
         return float(slide_position[0][0]), float(slide_position[1][0])
 
@@ -148,7 +147,7 @@ class Event:
         """
         # Convert a crop size in micrometers to pixels
         if not in_pixels:
-            crop_size = round(crop_size / self.scan.pixel_size_um)
+            crop_size = round(crop_size / self.tile.scan.pixel_size_um)
         image_height, image_width = 0, 0
         for image in images:
             if image_height == 0 and image_width == 0:
@@ -294,21 +293,68 @@ class Event:
             crops[label] = imageio.imread(file)
         return crops
 
+    def get_montage_channels(
+        self,
+        channels: Sequence[int | str] | None,
+        composites: dict[int | str, tuple[float, float, float]] | None,
+    ) -> tuple[list[int], list[int], dict[int, tuple[float, float, float]]]:
+        """
+        Get the channel names for the montage from the event's tile.
+        :param channels: channel indices or names for grayscale channels
+        :param composites: dictionary of channel indices or names and RGB values
+        :return: (1) channel indices to retrieve,
+                 (2) relative grayscale channel indices, and
+                 (3) composite channel indices and RGB values.
+        """
+        if channels is None:
+            channels = list(range(len(self.tile.scan.channels)))
+        if (len(channels) == 0) and (composites is None or len(composites) == 0):
+            raise ValueError("Must provide at least one channel type to montage")
+
+        channels_to_get = []
+
+        # Build the list of channels to retrieve
+        if channels is not None:
+            if isinstance(channels[0], str):
+                channels = self.tile.scan.get_channel_indices(channels)
+            channels_to_get += channels
+            order = list(range(len(channels)))  # Always the first n channels
+        else:
+            order = None
+
+        if composites is not None:
+            relative_composites = {}  # Relative indices for retrieved channels
+            # Convert to scan indices
+            rgb_channels = list(composites.keys())
+            if isinstance(rgb_channels[0], str):
+                rgb_channels = self.tile.scan.get_channel_indices(rgb_channels)
+            # Find the index or add to the end
+            for channel, rgb in zip(rgb_channels, composites.values()):
+                if channel not in channels_to_get:
+                    channels_to_get.append(channel)
+                    relative_composites[channel] = rgb
+                else:
+                    relative_composites[channels_to_get.index(channel)] = rgb
+        else:
+            relative_composites = None
+
+        return channels_to_get, order, relative_composites
+
     def get_montage(
         self,
-        channels: Iterable[int | str] = None,
+        channels: Sequence[int | str] = None,
         composites: dict[int | str, tuple[float, float, float]] = None,
         crop_size: int = 100,
         in_pixels: bool = True,
         input_path: str = None,
-        apply_gain: bool | Iterable[bool] = True,
+        apply_gain: bool = True,
         **kwargs,
     ) -> np.ndarray:
         """
         Convenience function for getting frame images and creating a montage. Mirrors
         csi_images.make_montage(). Convenient for a single event's montage, but less
         efficient when for multiple events from the same tile.
-        :param channels: the channels to extract images for. Defaults to all channels.
+        :param channels: the channels to use for black-and-white montages.
         :param composites: dictionary of indices and RGB tuples for a composite.
         :param crop_size: the square size of the image crop to get for this event.
         :param in_pixels: whether the crop size is in pixels or micrometers. Defaults to pixels.
@@ -318,18 +364,9 @@ class Event:
         :param kwargs: montage options. See csi_images.make_montage() for more details.
         :return: numpy array representing the montage.
         """
+        channels, order, composites = self.get_montage_channels(channels, composites)
         images = self.get_crops(crop_size, in_pixels, input_path, channels, apply_gain)
-        order = [f.channel for f in Frame.get_frames(self.tile, channels)]
-        # Make the composites dict to match the channel indices
-        if composites is None:
-            idx_composites = None
-        else:
-            idx_composites = {}
-            for key, value in composites.items():
-                if isinstance(key, str):
-                    key = Frame(self.tile, key).channel
-                idx_composites[key] = value
-        return csi_images.make_montage(images, order, idx_composites, **kwargs)
+        return csi_images.make_montage(images, order, composites, **kwargs)
 
     def save_montage(
         self,
@@ -436,7 +473,7 @@ class Event:
     def get_many_montages(
         cls,
         events: Sequence[Self],
-        channels: Iterable[int | str] = None,
+        channels: Sequence[int | str] = None,
         composites: dict[int | str, tuple[float, float, float]] = None,
         crop_size: int = 100,
         in_pixels: bool = True,
@@ -467,40 +504,33 @@ class Event:
             input_path = [input_path] * len(events)
 
         # Get the order of the events when sorted by slide/tile
-        order, _ = zip(*sorted(enumerate(events), key=lambda x: x[1].__repr__()))
+        event_order, _ = zip(*sorted(enumerate(events), key=lambda x: x[1].__repr__()))
 
         # Allocate the list to size
-        montages = [None] * len(events)
-        last_tile = None
+        montages = [np.empty(0)] * len(events)
+        # Placeholder variables to avoid rereading the same tile
         images = None  # Holds large numpy arrays, so expensive to compare
-        montage_order = None
-        idx_composites = None
-
+        order = None
+        rel_composites = None
+        last_tile = None
         # Iterate through in slide/tile sorted order
-        for i in order:
+        for i in event_order:
             if last_tile != events[i].tile:
+                channels_to_get, order, rel_composites = events[i].get_montage_channels(
+                    channels, composites
+                )
                 # Gather the frame images, preserving them for the next event
-                frames = Frame.get_frames(events[i].tile, channels)
+                frames = Frame.get_frames(events[i].tile, channels_to_get)
                 if isinstance(apply_gain, bool):
                     apply = [apply_gain] * len(frames)
                 else:
                     apply = apply_gain
                 images = [f.get_image(input_path[i], a) for f, a in zip(frames, apply)]
-                # Get the montage and composite order (just in case)
-                montage_order = [f.channel for f in frames]
-                if composites is None:
-                    idx_composites = None
-                else:
-                    idx_composites = {}
-                    for key, value in composites.items():
-                        if isinstance(key, str):
-                            key = Frame(events[i].tile, key).channel
-                        idx_composites[key] = value
                 last_tile = events[i].tile
             # Use the frame images to crop the event images and make montages
             crops = events[i].crop(images, crop_size[i], in_pixels)
             montages[i] = csi_images.make_montage(
-                crops, montage_order, idx_composites, **kwargs
+                crops, order, rel_composites, **kwargs
             )
 
         return montages
@@ -636,12 +666,10 @@ class EventArray:
             return len(self.info)
 
     def __eq__(self, other):
-        is_equal = True
         # Parse all possibilities for info
         if isinstance(self.info, pd.DataFrame):
             if isinstance(other.info, pd.DataFrame):
-                is_equal = self.info.equals(other.info)
-                if not is_equal:
+                if not self.info.equals(other.info):
                     return False
             else:
                 return False
@@ -886,7 +914,6 @@ class EventArray:
             # Create the event and append it to the list
             events.append(
                 Event(
-                    scan,
                     Tile(scan, self.info["tile"][i], self.info["roi"][i]),
                     self.info["x"][i],
                     self.info["y"][i],
@@ -904,7 +931,7 @@ class EventArray:
         """
         info = pd.DataFrame(
             {
-                "slide_id": [event.scan.slide_id for event in events],
+                "slide_id": [event.tile.scan.slide_id for event in events],
                 "tile": [event.tile.n for event in events],
                 "roi": [event.tile.n_roi for event in events],
                 "x": [event.x for event in events],
@@ -1294,7 +1321,6 @@ class EventArray:
             "ocular_not_interesting.rds",
         ),
         drop_common_events=True,
-        log=None,
     ) -> Self:
         """
 
@@ -1304,7 +1330,6 @@ class EventArray:
         :param others_data_files:
         :param atlas_data_files:
         :param drop_common_events:
-        :param log:
         :return:
         """
         if pyreadr is None:
@@ -1328,8 +1353,7 @@ class EventArray:
         for file in data_files:
             file_path = os.path.join(input_path, file)
             if not os.path.isfile(file_path):
-                if log is not None:
-                    log.warning(f"{file} not found for in {input_path}")
+                warnings.warn(f"{file} not found for in {input_path}")
                 continue
             file_data[file] = pyreadr.read_r(file_path)
             # Get the DataFrame associated with None (pyreadr dict quirk)
@@ -1337,12 +1361,8 @@ class EventArray:
             if len(file_data[file]) == 0:
                 # File gets dropped from the dict
                 file_data.pop(file)
-                if log is not None:
-                    log.warning(f"{file} has no cells")
+                warnings.warn(f"{file} has no cells")
                 continue
-
-            if log is not None:
-                log.debug(f"{file} has {len(file_data[file])} cells")
 
             # Drop common cells if requested and in this file
             if (
@@ -1353,18 +1373,12 @@ class EventArray:
                 common_cell_indices = (
                     file_data[file]["catalogue_classification"] == "common_cell"
                 )
-                if log is not None:
-                    log.debug(
-                        f"Dropping {int(pd.Series.sum(common_cell_indices))}"
-                        f"common cells from {file}"
-                    )
                 file_data[file] = file_data[file][common_cell_indices == False]
 
             if len(file_data[file]) == 0:
                 # File gets dropped from the dict
                 file_data.pop(file)
-                if log is not None:
-                    log.warning(f"{file} has no cells after dropping common cells")
+                warnings.warn(f"{file} has no cells after dropping common cells")
                 continue
 
             # Extract frame_id and cell_id
@@ -1374,11 +1388,14 @@ class EventArray:
                 # get frame_id cell_id from rownames column and split into two columns
                 split_res = file_data[file]["rowname"].str.split(" ", n=1, expand=True)
                 if len(split_res.columns) != 2:
-                    log.warning(
+                    warnings.warn(
                         f'Expected "frame_id cell_id" but got {file_data[file]["rowname"]}'
                     )
                 # then assign it back to the dataframe
                 file_data[file][["frame_id", "cell_id"]] = split_res.astype("int")
+            # Ensure frame_id and cell_id are integers
+            file_data[file]["frame_id"] = file_data[file]["frame_id"].astype("int")
+            file_data[file]["cell_id"] = file_data[file]["cell_id"].astype("int")
             # reset indexes since they can cause NaN values in concat
             file_data[file] = file_data[file].reset_index(drop=True)
 
@@ -1389,9 +1406,6 @@ class EventArray:
             data = [file_data[file] for file in file_data.keys()][0]
         else:
             data = pd.concat(file_data.values())
-
-        if log is not None:
-            log.debug(f"Gathered a total of {len(data)} events")
 
         # Others is missing the "slide_id". Insert it right before "frame_id" column
         if event_type == "others" and "slide_id" not in data.columns:
@@ -1441,6 +1455,8 @@ class EventArray:
                     "True": True,
                     "FALSE": False,
                     "TRUE": True,
+                    False: False,
+                    True: True,
                 }
                 metadata[col] = metadata[col].map(labels).astype(bool)
         for col in ["catalogue_id", "catalogue_distance", "clust", "hcpc"]:

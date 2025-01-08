@@ -20,13 +20,16 @@ class Tile:
 
     def __init__(self, scan: Scan, coordinates: int | tuple[int, int], n_roi: int = 0):
         self.scan = scan
-        tile_rows = scan.roi[n_roi].tile_rows
-        tile_cols = scan.roi[n_roi].tile_cols
-        total_tiles = tile_rows * tile_cols
+
         # Check that the n_roi is valid
         if n_roi >= len(self.scan.roi):
             raise ValueError(f"n_roi {n_roi} is out of bounds for scan.")
         self.n_roi = int(n_roi)
+
+        # Check that the coordinates are valid
+        tile_rows = scan.roi[n_roi].tile_rows
+        tile_cols = scan.roi[n_roi].tile_cols
+        total_tiles = tile_rows * tile_cols
         if np.issubdtype(type(coordinates), np.integer):
             # We received "n" as the coordinates
             if 0 > coordinates or coordinates > total_tiles:

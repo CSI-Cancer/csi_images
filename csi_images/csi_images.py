@@ -147,7 +147,11 @@ def make_montage(
         raise ValueError("Images must be 2D.")
     if composites is not None and not all([len(c) == 3 for c in composites.values()]):
         raise ValueError("Composites must be RGB tuples.")
-    if order is None and composites is None:
+
+    n_images = len(order) if order is not None else 0
+    n_images += 1 if composites is not None else 0
+
+    if n_images == 0:
         raise ValueError("No images or composites requested.")
 
     # Adapt label font size if necessary
@@ -155,8 +159,6 @@ def make_montage(
         label_size = int(images[0].shape[1] * label_size)
 
     # Populate the montage with black
-    n_images = len(order) if order is not None else 0
-    n_images += 1 if composites is not None else 0
     montage = np.full(
         get_montage_shape(images[0].shape, n_images, border_size, horizontal),
         np.iinfo(dtype).max,  # White fill
@@ -180,7 +182,7 @@ def make_montage(
     image_height, image_width = images[0].shape
 
     # Composite first
-    if composites is not None:
+    if composites is not None and len(composites) > 0:
         image = make_rgb(
             [images[i] for i in composites.keys()],
             list(composites.values()),
@@ -224,6 +226,7 @@ def make_montage(
             offset += image_height + border_size
 
     # Grayscale order next
+    order = [] if order is None else order
     for i, o in enumerate(order):
         image = images[o]
         image = scale_bit_depth(image, dtype)

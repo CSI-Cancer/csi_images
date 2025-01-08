@@ -5,10 +5,11 @@ object can also be loaded from a .czi file or a .txt file.
 """
 
 import os
+import math
 import enum
 import datetime
 import zoneinfo
-from typing import Self, Iterable, Any
+from typing import Self, Iterable
 
 import yaml
 import json
@@ -40,8 +41,9 @@ class Scan(yaml.YAMLObject):
         Type.AXIOSCAN7: "scan.yaml",
         Type.BZSCANNER: "slideinfo.txt",
     }
+    STANDARD_DATETIME_FORMAT = "%Y-%m-%dT%H:%M:%S%z"
     DATETIME_FORMAT = {
-        Type.AXIOSCAN7: "%Y-%m-%dT%H:%M:%S%z",
+        Type.AXIOSCAN7: STANDARD_DATETIME_FORMAT,
         Type.BZSCANNER: "%a %b %d %H:%M:%S %Y",
     }
 
@@ -131,8 +133,8 @@ class Scan(yaml.YAMLObject):
         slide_id: str = "",
         exists: bool = True,
         path: str = "",
-        start_date: str = "",
-        end_date: str = "",
+        start_datetime: str = "",
+        end_datetime: str = "",
         scan_time_s: int = -1,
         scanner_id: str = "",
         tray_pos: int = -1,
@@ -142,6 +144,8 @@ class Scan(yaml.YAMLObject):
         pixel_size_um: float = -1.0,
         tile_width_px: int = -1,
         tile_height_px: int = -1,
+        tile_x_offset_px: int = -1,
+        tile_y_offset_px: int = -1,
         tile_overlap_proportion: int = -1,
         channels: list[Channel] = None,
         roi: list[ROI] = None,
@@ -153,8 +157,8 @@ class Scan(yaml.YAMLObject):
         self.slide_id = slide_id
         self.exists = exists
         self.path = path
-        self.start_date = start_date
-        self.end_date = end_date
+        self.start_datetime = start_datetime
+        self.end_datetime = end_datetime
         self.scan_time_s = scan_time_s
         self.scanner_id = scanner_id
         self.tray_pos = tray_pos
@@ -164,6 +168,8 @@ class Scan(yaml.YAMLObject):
         self.pixel_size_um = pixel_size_um
         self.tile_width_px = tile_width_px
         self.tile_height_px = tile_height_px
+        self.tile_x_offset_px = tile_x_offset_px
+        self.tile_y_offset_px = tile_y_offset_px
         self.tile_overlap_proportion = tile_overlap_proportion
         self.channels = channels
         self.roi = roi
@@ -173,8 +179,8 @@ class Scan(yaml.YAMLObject):
             self.slide_id,
             self.exists,
             self.path,
-            self.start_date,
-            self.end_date,
+            self.start_datetime,
+            self.end_datetime,
             self.scan_time_s,
             self.scanner_id,
             self.tray_pos,
@@ -205,6 +211,8 @@ class Scan(yaml.YAMLObject):
             and self.pixel_size_um == other.pixel_size_um
             and self.tile_width_px == other.tile_width_px
             and self.tile_height_px == other.tile_height_px
+            and self.tile_x_offset_px == other.tile_x_offset_px
+            and self.tile_y_offset_px == other.tile_y_offset_px
             and self.tile_overlap_proportion == other.tile_overlap_proportion
             and self.channels == other.channels
             and all(a.similar(b) for a, b in zip(self.roi, other.roi))
@@ -246,6 +254,15 @@ class Scan(yaml.YAMLObject):
                 )
         return channel_indices
 
+    def get_image_size(self) -> tuple[int, int]:
+        """
+        Get the real size of the image in pixels after subtracting overlap.
+        :return: a tuple of (real_height, real_width) for easy comparison to arrays
+        """
+        width_overlap = math.floor(self.tile_width_px * self.tile_overlap_proportion)
+        height_overlap = math.floor(self.tile_height_px * self.tile_overlap_proportion)
+        return self.tile_height_px - height_overlap, self.tile_width_px - width_overlap
+
     def save_yaml(self, output_path: str):
         """
         Write the Scan object to a .yaml file.
@@ -284,6 +301,11 @@ class Scan(yaml.YAMLObject):
         return metadata_obj
 
     def to_dict(self) -> dict:
+        """
+        Convert the Scan object to a dictionary with keys matching database columns
+        and values matching database entries
+        :return: a dictionary
+        """
         # Dump to json; then add indents and a top-level key
         channels_json = json.dumps(
             self.channels, default=lambda x: x.__dict__, indent=2
@@ -295,48 +317,69 @@ class Scan(yaml.YAMLObject):
         roi_json = "  ".join(roi_json.splitlines(True))
         roi_json = "{\n  " + '"data": ' + roi_json + "\n}"
 
+        # Keys are named the same as database columns
         return {
+            "scanner_id": self.scanner_id,
             "slide_id": self.slide_id,
             "exists": self.exists,
             "path": self.path,
-            "start_date": self.start_date,
-            "end_date": self.end_date,
-            "scan_time_s": self.scan_time_s,
-            "scanner_id": self.scanner_id,
+            "start_datetime": self.start_datetime,
+            "end_datetime": self.end_datetime,
             "tray_pos": self.tray_pos,
             "slide_pos": self.slide_pos,
+            "tile_width": self.tile_width_px,
+            "tile_height": self.tile_height_px,
+            "tile_x_offset": self.tile_x_offset_px,
+            "tile_y_offset": self.tile_y_offset_px,
+            "tile_overlap": self.tile_overlap_proportion,
             "camera": self.camera,
             "objective": self.objective,
-            "pixel_size_um": self.pixel_size_um,
-            "tile_width_px": self.tile_width_px,
-            "tile_height_px": self.tile_height_px,
-            "tile_overlap_proportion": self.tile_overlap_proportion,
+            "pixel_size": self.pixel_size_um,
             "channels": channels_json,
             "roi": roi_json,
         }
 
     @classmethod
     def from_dict(cls, scan_dict) -> Self:
+        """
+        Convert a dictionary from to_dict() or the database to a Scan object
+        :param scan_dict: a dictionary
+        :return: a Scan object
+        """
         local_timezone = zoneinfo.ZoneInfo("localtime")
-        dt = (scan_dict["end_datetime"] - scan_dict["start_datetime"]).total_seconds()
+        if isinstance(scan_dict["start_datetime"], str):
+            start_datetime = datetime.datetime.strptime(
+                scan_dict["start_datetime"], cls.STANDARD_DATETIME_FORMAT
+            ).astimezone(local_timezone)
+        else:
+            start_datetime = scan_dict["start_datetime"].astimezone(local_timezone)
+        if isinstance(scan_dict["end_datetime"], str):
+            end_datetime = datetime.datetime.strptime(
+                scan_dict["end_datetime"], cls.STANDARD_DATETIME_FORMAT
+            ).astimezone(local_timezone)
+        else:
+            end_datetime = scan_dict["end_datetime"].astimezone(local_timezone)
+        dt = (end_datetime - start_datetime).total_seconds()
         result = cls(
+            scanner_id=scan_dict["scanner_id"],
             slide_id=scan_dict["slide_id"],
             exists=scan_dict["exists"],
             path=scan_dict["path"],
-            start_date=scan_dict["start_datetime"].astimezone(local_timezone),
-            end_date=scan_dict["end_datetime"].astimezone(local_timezone),
+            start_datetime=start_datetime.strftime(cls.STANDARD_DATETIME_FORMAT),
+            end_datetime=end_datetime.strftime(cls.STANDARD_DATETIME_FORMAT),
             scan_time_s=int(dt),
-            scanner_id=scan_dict["scanner_id"],
             tray_pos=scan_dict["tray_pos"],
             slide_pos=scan_dict["slide_pos"],
+            tile_width_px=scan_dict["tile_width"],
+            tile_height_px=scan_dict["tile_height"],
+            tile_x_offset_px=scan_dict["tile_x_offset"],
+            tile_y_offset_px=scan_dict["tile_y_offset"],
+            tile_overlap_proportion=scan_dict["tile_overlap"],
             camera=scan_dict["camera"],
             objective=scan_dict["objective"],
             pixel_size_um=scan_dict["pixel_size"],
-            tile_width_px=scan_dict["tile_width"],
-            tile_height_px=scan_dict["tile_height"],
-            tile_overlap_proportion=scan_dict["tile_overlap"],
         )
-        for channel_json in scan_dict["channels"]["data"]:
+        for channel_json in json.loads(scan_dict["channels"])["data"]:
             result.channels.append(
                 cls.Channel(
                     name=channel_json["name"],
@@ -345,7 +388,7 @@ class Scan(yaml.YAMLObject):
                     gain_applied=channel_json["gain_applied"],
                 )
             )
-        for roi_json in scan_dict["roi"]["data"]:
+        for roi_json in json.loads(scan_dict["roi"])["data"]:
             result.roi.append(
                 cls.ROI(
                     origin_x_um=roi_json["origin_x_um"],
@@ -362,6 +405,7 @@ class Scan(yaml.YAMLObject):
     @classmethod
     def load_czi(cls, input_path: str) -> Self:
         """
+        Extracts metadata from a .czi file, which is the output of the Axioscan
         :param input_path: the path to the .czi file
         :return: a Scan object
         """
@@ -374,10 +418,11 @@ class Scan(yaml.YAMLObject):
         # Normalize paths
         input_path = os.path.abspath(input_path)
 
-        # Read in metadata as XML elements
-        metadata_xml = aicspylibczi.CziFile(input_path).meta
-        # Read in shape metadata from binary
-        rois_shape = aicspylibczi.CziFile(input_path).get_dims_shape()
+        with open(input_path, "rb") as file:
+            # Read in metadata as XML elements
+            metadata_xml = aicspylibczi.CziFile(file).meta
+            # Read in shape metadata from binary
+            rois_shape = aicspylibczi.CziFile(file).get_dims_shape()
 
         # Populate metadata
         scan = cls()
@@ -397,16 +442,12 @@ class Scan(yaml.YAMLObject):
         date_as_datetime = datetime.datetime.strptime(
             date, cls.DATETIME_FORMAT[cls.Type.AXIOSCAN7]
         )
-        scan.start_date = date_as_datetime.strftime(
-            cls.DATETIME_FORMAT[cls.Type.AXIOSCAN7]
-        )
+        scan.start_datetime = date_as_datetime.strftime(cls.STANDARD_DATETIME_FORMAT)
         scan.scan_time_s = round(
             float(metadata_xml.find(".//Image/AcquisitionDuration").text) / 1000
         )
         date_as_datetime += datetime.timedelta(seconds=scan.scan_time_s)
-        scan.end_date = date_as_datetime.strftime(
-            cls.DATETIME_FORMAT[cls.Type.AXIOSCAN7]
-        )
+        scan.end_datetime = date_as_datetime.strftime(cls.STANDARD_DATETIME_FORMAT)
 
         scan.tray_pos = int(metadata_xml.find(".//SlotNumberOfLoadedTray").text)
         scan.slide_pos = int(metadata_xml.find(".//SlideScannerPosition").text[-1])
@@ -430,11 +471,19 @@ class Scan(yaml.YAMLObject):
         # Get tile information
         # Note: X Y is untested, could be flipped. I always forget. Just don't use
         # non-square frames and we're all good.
-        tile_info = metadata_xml.find(".//HardwareSetting/ParameterCollection/Frame")
+        selected_detector = metadata_xml.find(".//SelectedDetector").text
+        detectors = metadata_xml.findall(".//Detectors/Detector")
+        for detector in detectors:
+            if detector.attrib["Id"] == selected_detector:
+                tile_info = detector.find(".//Frame")
+                break
+        # Convert to integers
         tile_info = [int(coordinate) for coordinate in tile_info.text.split(",")]
 
-        scan.tile_width_px = rois_shape[0]["X"][1]
-        scan.tile_height_px = rois_shape[0]["Y"][1]
+        scan.tile_x_offset_px = tile_info[0]
+        scan.tile_y_offset_px = tile_info[1]
+        scan.tile_width_px = tile_info[2]
+        scan.tile_height_px = tile_info[3]
         scan.tile_overlap_proportion = float(metadata_xml.find(".//Overlap").text)
 
         # Extract channels and create Channel objects from them
@@ -567,9 +616,9 @@ class Scan(yaml.YAMLObject):
     @classmethod
     def load_txt(cls, input_path: str) -> Self:
         """
-        Loads a Scan object from a .txt file, which originates from the BZScanner.
-        Some metadata from the slideinfo.txt file is missing or adjusted to fit.
-        :param input_path: /path/to/file.txt or /path/to/folder that contains slideinfo.txt
+        Loads a Scan object from a .txt file, usually slideinfo.txt, which originates
+        from the BZScanner. Some metadata is filled in or adjusted to fit
+        :param input_path: /path/to/file.txt or /path/to/folder containing slideinfo.txt
         :return: a Scan object
         """
         # Set paths
@@ -604,14 +653,10 @@ class Scan(yaml.YAMLObject):
         date_as_datetime = date_as_datetime.astimezone(
             zoneinfo.ZoneInfo("America/Los_Angeles")
         )  # Hardcoded because BZScanners are here
-        scan.start_date = date_as_datetime.strftime(
-            cls.DATETIME_FORMAT[cls.Type.AXIOSCAN7]
-        )
+        scan.start_datetime = date_as_datetime.strftime(cls.STANDARD_DATETIME_FORMAT)
         scan.scan_time_s = 90 * 60  # estimated 90 minutes per scan
         date_as_datetime += datetime.timedelta(seconds=scan.scan_time_s)
-        scan.end_date = date_as_datetime.strftime(
-            cls.DATETIME_FORMAT[cls.Type.AXIOSCAN7]
-        )
+        scan.end_datetime = date_as_datetime.strftime(cls.STANDARD_DATETIME_FORMAT)
 
         # Map the raw scanner ID (service ID) to our IDs
         scan.scanner_id = f'{cls.Type.BZSCANNER.value}_{metadata_dict["INSTRUMENT"]}'
@@ -628,7 +673,9 @@ class Scan(yaml.YAMLObject):
         # Get tile information
         scan.tile_width_px = 1362  # Known from image metadata
         scan.tile_height_px = 1004  # Known from image metadata
-        scan.tile_overlap_proportion = 0
+        scan.tile_x_offset_px = 0  # Already removed
+        scan.tile_y_offset_px = 0  # Already removed
+        scan.tile_overlap_proportion = 0  # Already removed
 
         # Extract channels and create Channel objects from them
         if "gain_applied" in metadata_dict:
@@ -686,8 +733,8 @@ class Scan(yaml.YAMLObject):
     @classmethod
     def load_from_folder(cls, input_path: str) -> Self:
         """
-        Load a Scan object from a folder that contains scan.yaml or slideinfo.txt.
-        Prefers scan.yaml if both exist.
+        Load a Scan object from a folder that contains defaultly-named metadata files,
+        scan.yaml or slideinfo.txt. Prefers scan.yaml if both exist
         :param input_path: /path/to/folder
         :return: a Scan object
         """
