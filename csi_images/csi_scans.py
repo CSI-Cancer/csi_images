@@ -131,12 +131,12 @@ class Scan(yaml.YAMLObject):
     def __init__(
         self,
         slide_id: str = "",
-        exists: bool = True,
+        scanner_id: str = "",
         path: str = "",
+        exists: bool = True,
         start_datetime: str = "",
         end_datetime: str = "",
         scan_time_s: int = -1,
-        scanner_id: str = "",
         tray_pos: int = -1,
         slide_pos: int = -1,
         camera: str = "",
@@ -155,12 +155,12 @@ class Scan(yaml.YAMLObject):
         if channels is None:
             channels = []
         self.slide_id = slide_id
-        self.exists = exists
+        self.scanner_id = scanner_id
         self.path = path
+        self.exists = exists
         self.start_datetime = start_datetime
         self.end_datetime = end_datetime
         self.scan_time_s = scan_time_s
-        self.scanner_id = scanner_id
         self.tray_pos = tray_pos
         self.slide_pos = slide_pos
         self.camera = camera
@@ -177,12 +177,12 @@ class Scan(yaml.YAMLObject):
     def __key(self):
         return (
             self.slide_id,
-            self.exists,
+            self.scanner_id,
             self.path,
+            self.exists,
             self.start_datetime,
             self.end_datetime,
             self.scan_time_s,
-            self.scanner_id,
             self.tray_pos,
             self.slide_pos,
             self.camera,
@@ -363,21 +363,21 @@ class Scan(yaml.YAMLObject):
         result = cls(
             scanner_id=scan_dict["scanner_id"],
             slide_id=scan_dict["slide_id"],
-            exists=scan_dict["exists"],
             path=scan_dict["path"],
+            exists=scan_dict["exists"],
             start_datetime=start_datetime.strftime(cls.STANDARD_DATETIME_FORMAT),
             end_datetime=end_datetime.strftime(cls.STANDARD_DATETIME_FORMAT),
             scan_time_s=int(dt),
             tray_pos=scan_dict["tray_pos"],
             slide_pos=scan_dict["slide_pos"],
+            camera=scan_dict["camera"],
+            objective=scan_dict["objective"],
+            pixel_size_um=scan_dict["pixel_size"],
             tile_width_px=scan_dict["tile_width"],
             tile_height_px=scan_dict["tile_height"],
             tile_x_offset_px=scan_dict["tile_x_offset"],
             tile_y_offset_px=scan_dict["tile_y_offset"],
             tile_overlap_proportion=scan_dict["tile_overlap"],
-            camera=scan_dict["camera"],
-            objective=scan_dict["objective"],
-            pixel_size_um=scan_dict["pixel_size"],
         )
         # Handle JSON and dictionaries
         if isinstance(scan_dict["channels"], str):
