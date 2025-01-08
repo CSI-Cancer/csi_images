@@ -243,6 +243,8 @@ def test_ocular_conversions():
     result.metadata["hcpc"] = new_result.metadata["hcpc"].copy()
     assert result == new_result
     # Clean up
+    os.remove("tests/data/ocular_interesting.csv")
+    os.remove("tests/data/ocular_interesting.rds")
     os.remove("tests/data/rc-final.csv")
     os.remove("tests/data/rc-final.rds")
     os.remove("tests/data/rc-final1.rds")

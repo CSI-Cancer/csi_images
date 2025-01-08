@@ -1,3 +1,5 @@
+import warnings
+
 import numpy as np
 import pandas as pd
 
@@ -173,7 +175,11 @@ def make_montage(
             or opened_font.path != label_font
             or opened_font.size != label_size
         ):
-            opened_font = ImageFont.truetype(label_font, label_size)
+            try:
+                opened_font = ImageFont.truetype(label_font, label_size)
+            except OSError:
+                warnings.warn(f"Could not load font {label_font}. Using defaults.")
+                opened_font = ImageFont.load_default(label_size)
     elif labels is not None:
         raise ValueError("Number of labels must be 0, match order, or match images.")
 
