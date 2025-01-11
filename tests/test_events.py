@@ -29,6 +29,15 @@ def axscan():
     return Scan.load_yaml("tests/data")
 
 
+@pytest.fixture
+def circle():
+    circle = np.zeros((100, 100, 3), dtype=np.uint8)
+    circle = cv2.circle(circle, (50, 50), 20, (1, 0, 0), -1)
+    circle = circle[:, :, 0]
+    circle = circle.astype(np.uint8)
+    return circle
+
+
 def test_get_crops(bzscan):
     tile = Tile(bzscan, 1000)
     event = Event(tile, 400, 350)
@@ -312,20 +321,51 @@ def test_copy_sort_rows_get(axscan):
     assert events_get.info["y"].equals(pd.Series([2000, 0, 100], dtype=np.uint16))
 
 
-def test_event_montages(bzscan):
+def test_event_montages(bzscan, circle):
     tile = Tile(bzscan, 1000)
     event = Event(tile, 515, 411)
     images = event.get_crops(crop_size=100)
 
     montage = csi_images.make_montage(
         images,
-        [0, 1, 4, 2],
+        [0, 1, 4, 2, 3],
         {0: (0, 0, 1), 1: (1, 0, 0), 2: (0, 1, 0), 4: (1, 1, 1)},
-        labels=["RGB", "DAPI", "AF555", "AF488", "AF647"],
+        labels=["RGB", "DAPI", "AF555", "AF488", "AF647", "BRIGHT"],
     )
     if SHOW_PLOTS:
         cv2.imshow(
             "Full, classic montage with labels",
+            cv2.cvtColor(montage, cv2.COLOR_RGB2BGR),
+        )
+        cv2.waitKey(0)
+        cv2.destroyAllWindows()
+
+    montage = csi_images.make_montage(
+        images,
+        [0, 1, 4, 2, 3],
+        {0: (0, 0, 1), 1: (1, 0, 0), 2: (0, 1, 0), 4: (1, 1, 1)},
+        labels=["RGB", "DAPI", "AF555", "AF488", "AF647", "BRIGHT"],
+        mask=circle,
+    )
+    if SHOW_PLOTS:
+        cv2.imshow(
+            "Full, classic montage with labels and mask overlay",
+            cv2.cvtColor(montage, cv2.COLOR_RGB2BGR),
+        )
+        cv2.waitKey(0)
+        cv2.destroyAllWindows()
+
+    montage = csi_images.make_montage(
+        images,
+        [0, 1, 4, 2, 3],
+        {0: (0, 0, 1), 1: (1, 0, 0), 2: (0, 1, 0), 4: (1, 1, 1)},
+        labels=["RGB", "DAPI", "AF555", "AF488", "AF647", "BRIGHT"],
+        mask=circle,
+        mask_mode="hard",
+    )
+    if SHOW_PLOTS:
+        cv2.imshow(
+            "Full, classic montage with labels and hard-masking",
             cv2.cvtColor(montage, cv2.COLOR_RGB2BGR),
         )
         cv2.waitKey(0)

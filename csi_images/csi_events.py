@@ -344,6 +344,8 @@ class Event:
         self,
         channels: Sequence[int | str] = None,
         composites: dict[int | str, tuple[float, float, float]] = None,
+        mask: np.ndarray[np.uint8] = None,
+        labels: Sequence[str] = None,
         crop_size: int = 100,
         in_pixels: bool = True,
         input_path: str = None,
@@ -356,6 +358,7 @@ class Event:
         efficient when for multiple events from the same tile.
         :param channels: the channels to use for black-and-white montages.
         :param composites: dictionary of indices and RGB tuples for a composite.
+        :param mask: a mask to apply to the montage. Must be the same size as the crop.
         :param crop_size: the square size of the image crop to get for this event.
         :param in_pixels: whether the crop size is in pixels or micrometers. Defaults to pixels.
         :param input_path: the path to the input images. Defaults to None (uses the scan's path).
@@ -366,7 +369,9 @@ class Event:
         """
         channels, order, composites = self.get_montage_channels(channels, composites)
         images = self.get_crops(crop_size, in_pixels, input_path, channels, apply_gain)
-        return csi_images.make_montage(images, order, composites, **kwargs)
+        return csi_images.make_montage(
+            images, order, composites, mask, labels, **kwargs
+        )
 
     def save_montage(
         self,
@@ -374,13 +379,17 @@ class Event:
         output_path: str,
         ocular_names: bool = False,
         tag: str = "",
+        file_extension: str = ".jpeg",
+        **kwargs,
     ):
         """
         Save the montage as a JPEG image with a set name.
         :param montage: the montage to save.
-        :param output_path: the folder to save the montage in. Wil make if needed.
+        :param output_path: the folder to save the montage in. Will make if needed.
         :param ocular_names: whether to use the OCULAR naming convention.
         :param tag: a tag to append to the file name. Ignored if ocular_names is True.
+        :param file_extension: the file extension to save the montage as. Defaults to .jpeg.
+        :param kwargs: additional arguments to pass to imageio.imwrite().
         :return: None
         """
         if csi_images is None or imageio is None:
@@ -391,17 +400,20 @@ class Event:
 
         montage = csi_images.scale_bit_depth(montage, np.uint8)
 
+        if not file_extension.startswith("."):
+            file_extension = f".{file_extension}"
+
         if ocular_names:
             if "cell_id" not in self.metadata.index:
                 raise ValueError(
                     "Event metadata must include 'cell_id' for OCULAR naming."
                 )
-            file = f"{self.tile.n}-{self.metadata['cell_id']}-{self.x}-{self.y}.jpeg"
+            file = f"{self.tile.n}-{self.metadata['cell_id']}-{self.x}-{self.y}{file_extension}"
         else:
-            file = f"{self}{tag}.jpeg"
+            file = f"{self}{tag}{file_extension}"
 
         os.makedirs(output_path, exist_ok=True)
-        imageio.imwrite(os.path.join(output_path, file), montage, quality=80)
+        imageio.imwrite(os.path.join(output_path, file), montage, **kwargs)
 
     def load_montage(self, input_path: str, tag: str = "") -> np.ndarray:
         """
@@ -475,6 +487,8 @@ class Event:
         events: Sequence[Self],
         channels: Sequence[int | str] = None,
         composites: dict[int | str, tuple[float, float, float]] = None,
+        masks: Sequence[np.ndarray[np.uint8]] = None,
+        labels: Sequence[str] = None,
         crop_size: int = 100,
         in_pixels: bool = True,
         input_path: str = None,
@@ -483,10 +497,11 @@ class Event:
     ) -> list[np.ndarray]:
         """
         Convenience function for get_montage(), but for a list of events. More efficient
-        thank get_montage() when working with multiple events from the same tile.
+        than get_montage() when working with multiple events from the same tile.
         :param events: a list of Event objects.
         :param channels: the channels to extract images for. Defaults to all channels.
         :param composites: dictionary of indices and RGB tuples for a composite.
+        :param masks: a list of masks to apply to the montages. Must be the same size as the crops.
         :param crop_size: the square size of the image crop to get for this event.
         :param in_pixels: whether the crop size is in pixels or micrometers. Defaults to pixels.
         :param input_path: the path to the input images. Defaults to None (uses the scan's path).
@@ -530,7 +545,7 @@ class Event:
             # Use the frame images to crop the event images and make montages
             crops = events[i].crop(images, crop_size[i], in_pixels)
             montages[i] = csi_images.make_montage(
-                crops, order, rel_composites, **kwargs
+                crops, order, rel_composites, masks[i], labels, **kwargs
             )
 
         return montages

@@ -1,5 +1,7 @@
 import warnings
+from typing import Literal
 
+import cv2
 import numpy as np
 import pandas as pd
 
@@ -67,14 +69,76 @@ def extract_mask_info(
     return info
 
 
+def add_mask_overlay(
+    images: np.ndarray | list[np.ndarray],
+    mask: np.ndarray[np.uint8],
+    overlay_color: tuple[float, float, float] = (0.8, 1, 0),
+):
+    """
+    Creates a 1-pixel wide border around the mask in the image.
+    :param images: (H, W, 3), or (H, W) image or list of images.
+    :param mask: (H, W) binary mask to overlay on the image.
+    :param overlay_color: color of the outline for RGB images.
+    Ignored for grayscale images.
+    :return:
+    """
+    results = []
+    # Temporarily make into a list
+    return_array = False
+    if isinstance(images, np.ndarray):
+        images = [images]
+        return_array = True
+
+    # Get the mask outline
+    mask_kernel = np.array([[0, 1, 0], [1, 1, 1], [0, 1, 0]], np.uint8)
+    outline = cv2.morphologyEx(mask, cv2.MORPH_DILATE, mask_kernel) - mask
+
+    # Add mask overlay to images
+    for image in images:
+        if image.shape[:2] != mask.shape:
+            raise ValueError("Image and mask must have the same shape.")
+        if np.issubdtype(image.dtype, np.unsignedinteger):
+            # Unsigned integer; scale outline to image range
+            this_outline = outline.astype(image.dtype) * np.iinfo(image.dtype).max
+        else:
+            # Floating point; scale outline to [0, 1]
+            this_outline = outline.astype(image.dtype)
+        if len(image.shape) == 3:
+            # (H, W, 3) RGB image
+            # Scale outline with color and match dtype
+            this_outline = np.stack([this_outline * c for c in overlay_color], axis=-1)
+            this_outline = this_outline.astype(image.dtype)
+            # Set outline to 0, then to outline color
+            result = image * np.stack([1 - outline] * 3, axis=-1)
+            result += this_outline
+        elif len(image.shape) == 2:
+            # (H, W) grayscale image
+            result = image * (1 - outline)
+            result += this_outline.astype(image.dtype)
+        results.append(result)
+
+    if return_array:
+        return results[0]
+    else:
+        return results
+
+
 def make_rgb(
-    images: list[np.ndarray], colors=list[tuple[float, float, float]]
+    images: list[np.ndarray],
+    colors=list[tuple[float, float, float]],
+    mask: np.ndarray[np.uint8] = None,
+    mask_mode: Literal["overlay", "hard"] = "overlay",
+    overlay_color: tuple[float, float, float] = (0.8, 1, 0),
 ) -> np.ndarray:
     """
     Combine multiple channels into a single RGB image.
     :param images: list of numpy arrays representing the channels.
     :param colors: list of RGB tuples for each channel.
-    :return:
+    :param mask: numpy array representing a mask to overlay on the image.
+    :param mask_mode: whether to overlay the mask or use it as a hard mask.
+    :param overlay_color: color of the outline for RGB images.
+    Ignored for grayscale images.
+    :return: (H, W, 3) numpy array representing the RGB image.
     """
     if len(images) == 0:
         raise ValueError("No images provided.")
@@ -90,9 +154,14 @@ def make_rgb(
     # Create an output with same shape and larger type to avoid overflow
     dims = images[0].shape
     dtype = images[0].dtype
-    if dtype not in [np.uint8, np.uint16]:
-        raise ValueError("Image dtype must be uint8 or uint16.")
-    rgb = np.zeros((*dims, 3), dtype=np.uint16 if dtype == np.uint8 else np.uint32)
+
+    if dtype == np.uint8:
+        temp_dtype = np.uint16
+    elif dtype == np.uint16:
+        temp_dtype = np.uint32
+    else:
+        temp_dtype = np.float64
+    rgb = np.zeros((*dims, 3), dtype=temp_dtype)
 
     # Combine images with colors (can also be thought of as gains)
     for image, color in zip(images, colors):
@@ -100,12 +169,26 @@ def make_rgb(
             raise ValueError("All images must have the same shape.")
         if image.dtype != dtype:
             raise ValueError("All images must have the same dtype.")
-        rgb[..., 0] += (image * color[0]).astype(rgb.dtype)
-        rgb[..., 1] += (image * color[1]).astype(rgb.dtype)
-        rgb[..., 2] += (image * color[2]).astype(rgb.dtype)
+        rgb += np.stack([image * c for c in color], axis=-1)
 
     # Cut off any overflow and convert back to original dtype
-    rgb = np.clip(rgb, np.iinfo(dtype).min, np.iinfo(dtype).max).astype(dtype)
+    if np.issubdtype(dtype, np.unsignedinteger):
+        max_value = np.iinfo(dtype).max
+    else:
+        max_value = 1.0
+    rgb = np.clip(rgb, 0, max_value).astype(dtype)
+
+    # Add a mask if desired
+    if mask is not None:
+        if mask.shape != dims:
+            raise ValueError("Mask must have the same shape as the images.")
+        if mask_mode == "overlay":
+            rgb = add_mask_overlay(rgb, mask, overlay_color)
+        elif mask_mode == "hard":
+            rgb = rgb * np.stack([mask] * 3, axis=-1)
+        else:
+            raise ValueError("Mask mode must be 'overlay' or 'hard'.")
+
     return rgb
 
 
@@ -113,7 +196,10 @@ def make_montage(
     images: list[np.ndarray],
     order: list[int] | None,
     composites: dict[int, tuple[float, float, float]] | None,
+    mask: np.ndarray[np.uint8] = None,
     labels: list[str] = None,
+    mask_mode: Literal["overlay", "hard"] = "overlay",
+    overlay_color: tuple[float, float, float] = (0.8, 1, 0),
     label_font: str = "Roboto-Regular.ttf",
     label_size: int | float = 0.18,
     label_outline: bool = True,
@@ -128,6 +214,9 @@ def make_montage(
     :param images: list of numpy arrays representing the images.
     :param order: list of indices for the images going into the montage or None.
     :param composites: dictionary of indices and RGB tuples for a composite or None.
+    :param mask: numpy array representing a mask to overlay on the image.
+    :param mask_mode: whether to overlay the mask or use it as a hard mask.
+    :param overlay_color: color of the outline for RGB images. Ignored for grayscale.
     :param labels: list of labels for the images. If length == len(order), will apply to
     grayscale images only; if length == len(order) + 1 and composites exist, will apply
     to all images.
@@ -192,8 +281,11 @@ def make_montage(
         image = make_rgb(
             [images[i] for i in composites.keys()],
             list(composites.values()),
+            mask,
+            mask_mode,
+            overlay_color,
         )
-        image = scale_bit_depth(image, dtype)
+
         if labels is not None and len(labels) == n_images:
             # Draw a label on the composite
             pillow_image = Image.fromarray(image)
@@ -218,6 +310,9 @@ def make_montage(
             image = np.asarray(pillow_image)
             labels = labels[1:]
 
+        # Scale to desired dtype
+        image = scale_bit_depth(image, dtype)
+
         if horizontal:
             montage[
                 border_size : border_size + image_height,
@@ -235,10 +330,18 @@ def make_montage(
     order = [] if order is None else order
     for i, o in enumerate(order):
         image = images[o]
-        image = scale_bit_depth(image, dtype)
         image = np.tile(image[..., None], (1, 1, 3))  # Make 3-channel
 
+        if mask is not None:
+            if mask_mode == "overlay":
+                image = add_mask_overlay(image, mask, overlay_color)
+            elif mask_mode == "hard":
+                image *= np.stack([mask] * 3, axis=-1)
+            else:
+                raise ValueError("Mask mode must be 'overlay' or 'hard'.")
+
         if labels is not None and len(labels) == len(order):
+            image = scale_bit_depth(image, np.uint8)  # Required for PIL
             pillow_image = Image.fromarray(image)
             if colored_labels and o in composites:
                 text_fill = tuple(round(255 * rgb_f) for rgb_f in composites[o])
@@ -266,6 +369,9 @@ def make_montage(
                 stroke_fill=outline_fill,
             )
             image = np.asarray(pillow_image)
+
+        # Scale to desired dtype
+        image = scale_bit_depth(image, dtype)
 
         if horizontal:
             montage[
