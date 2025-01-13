@@ -107,10 +107,9 @@ def add_mask_overlay(
             # (H, W, 3) RGB image
             # Scale outline with color and match dtype
             this_outline = np.stack([this_outline * c for c in overlay_color], axis=-1)
-            this_outline = this_outline.astype(image.dtype)
             # Set outline to 0, then to outline color
             result = image * np.stack([1 - outline] * 3, axis=-1)
-            result += this_outline
+            result += this_outline.astype(image.dtype)
         elif len(image.shape) == 2:
             # (H, W) grayscale image
             result = image * (1 - outline)
@@ -169,7 +168,7 @@ def make_rgb(
             raise ValueError("All images must have the same shape.")
         if image.dtype != dtype:
             raise ValueError("All images must have the same dtype.")
-        rgb += np.stack([image * c for c in color], axis=-1)
+        rgb += np.stack([image * c for c in color], axis=-1).astype(temp_dtype)
 
     # Cut off any overflow and convert back to original dtype
     if np.issubdtype(dtype, np.unsignedinteger):
@@ -287,6 +286,7 @@ def make_montage(
         )
 
         if labels is not None and len(labels) == n_images:
+            image = scale_bit_depth(image, np.uint8)  # Required for PIL
             # Draw a label on the composite
             pillow_image = Image.fromarray(image)
             # Determine the fill color based on the average intensity of the image

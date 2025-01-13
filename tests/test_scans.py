@@ -115,12 +115,8 @@ def test_names_and_indices():
     # Should return -1 for None
     assert scan.get_channel_indices([None]) == [-1]
 
-    # Should raise an error if the channel is not found
-    try:
-        scan.get_channel_indices(["DAPI", "TRITC", "CY5", "FITC", "INVALID"])
-        assert False
-    except ValueError:
-        assert True
+    # Should return -1 for invalid channel names
+    assert scan.get_channel_indices(["INVALID"]) == [-1]
 
 
 def test_image_size():

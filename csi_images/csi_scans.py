@@ -230,7 +230,7 @@ class Scan(yaml.YAMLObject):
         Given a list of channel names, return the corresponding indices in the scan's
         channel order. Will convert BZScanner channel names (TRITC, CY5, FITC) to the
         actual AlexaFluor names (AF555, AF647, AF488).
-        If a list entry is None, it will return -1 for that entry.
+        If a list entry is not found or None, it will return -1 for that entry.
         :param channel_names: a list of channel names.
         :return: a list of channel indices.
         """
@@ -244,14 +244,10 @@ class Scan(yaml.YAMLObject):
                 name = self.BZSCANNER_CHANNEL_MAP[name]
 
             # Append the corresponding index if possible
-            if name is None:
-                channel_indices.append(-1)
-            elif name in scan_channel_names:
+            if name in scan_channel_names:
                 channel_indices.append(scan_channel_names.index(name))
             else:
-                raise ValueError(
-                    f"Channel name {name} not found in scan channels {scan_channel_names}"
-                )
+                channel_indices.append(-1)
         return channel_indices
 
     def get_image_size(self) -> tuple[int, int]:

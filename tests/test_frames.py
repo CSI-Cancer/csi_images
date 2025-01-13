@@ -13,7 +13,7 @@ if os.environ.get("DEBIAN_FRONTEND") == "noninteractive":
     SHOW_PLOTS = False
 else:
     # Change this to your preference for local testing, but commit as True
-    SHOW_PLOTS = True
+    SHOW_PLOTS = False
 
 
 @pytest.fixture

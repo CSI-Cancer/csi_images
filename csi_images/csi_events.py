@@ -502,6 +502,7 @@ class Event:
         :param channels: the channels to extract images for. Defaults to all channels.
         :param composites: dictionary of indices and RGB tuples for a composite.
         :param masks: a list of masks to apply to the montages. Must be the same size as the crops.
+        :param labels: the labels to subtitle montage images, usually the channel names
         :param crop_size: the square size of the image crop to get for this event.
         :param in_pixels: whether the crop size is in pixels or micrometers. Defaults to pixels.
         :param input_path: the path to the input images. Defaults to None (uses the scan's path).
@@ -517,6 +518,8 @@ class Event:
             crop_size = [crop_size] * len(events)
         if input_path is None or isinstance(input_path, str):
             input_path = [input_path] * len(events)
+        if masks is None or isinstance(masks, np.ndarray):
+            masks = [masks] * len(events)
 
         # Get the order of the events when sorted by slide/tile
         event_order, _ = zip(*sorted(enumerate(events), key=lambda x: x[1].__repr__()))
@@ -1084,6 +1087,7 @@ class EventArray:
         mask_info = mask_info.drop(columns=["id", "x", "y"], errors="ignore")
         if len(mask_info.columns) > 0:
             features = mask_info
+            features.columns = [col.lower() for col in features.columns]
         else:
             features = None
         return EventArray(info, metadata, features)
