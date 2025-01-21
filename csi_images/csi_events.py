@@ -882,7 +882,7 @@ class EventArray:
         ignore_features=False,
     ) -> list[Event]:
         """
-        Get the events in the EventArray as a list of events.
+        Get the events in the EventArray as a list of events. Returns [] if empty.
         :param scans: the scans that the events belong to, auto-matched by slide_id.
         Pass None if you don't care about scan metadata (pass ignore_missing_scans).
         :param ignore_missing_scans: whether to create blank scans for events without scans.
@@ -890,6 +890,8 @@ class EventArray:
         :param ignore_features: whether to ignore features or not
         :return:
         """
+        if len(self) == 0:
+            return []
         if isinstance(scans, Scan):
             scans = [scans]
         scans = {scan.slide_id: scan for scan in scans}
@@ -1032,9 +1034,7 @@ class EventArray:
     def from_mask(
         cls,
         mask: np.ndarray,
-        slide_id: str,
-        tile_n: int,
-        n_roi: int = 0,
+        tile: Tile,
         include_cell_id: bool = True,
         images: list[np.ndarray] = None,
         image_labels: list[str] = None,
@@ -1043,9 +1043,7 @@ class EventArray:
         """
         Extract events from a mask DataFrame, including metadata and features.
         :param mask: the mask to extract events from.
-        :param slide_id: the slide ID the mask is from.
-        :param tile_n: the tile number the mask is from.
-        :param n_roi: the ROI number the mask is from.
+        :param tile: the Tile object associated with this mask.
         :param include_cell_id: whether to include the cell_id, or numerical
         mask label, as metadata in the EventArray.
         :param images: the intensity images to extract features from.
@@ -1071,9 +1069,9 @@ class EventArray:
         # Combine provided info and mask info
         info = pd.DataFrame(
             {
-                "slide_id": slide_id,
-                "tile": tile_n,
-                "roi": n_roi,
+                "slide_id": tile.scan.slide_id,
+                "tile": tile.n,
+                "roi": tile.n_roi,
                 "x": mask_info["x"],
                 "y": mask_info["y"],
             },

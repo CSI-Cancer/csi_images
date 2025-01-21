@@ -4,7 +4,7 @@ in a scan. The module comes with several helper functions that allow for gatheri
 based on their position in the scan.
 """
 
-from typing import Self, Iterable
+from typing import Self, Iterable, Sequence
 
 import numpy as np
 
@@ -19,6 +19,12 @@ class Tile:
     """
 
     def __init__(self, scan: Scan, coordinates: int | tuple[int, int], n_roi: int = 0):
+        """
+
+        :param scan: Scan object to associate with this tile
+        :param coordinates: n or (x, y) coordinates of the tile in the scan
+        :param n_roi: the region of interest to use, defaults to 0
+        """
         self.scan = scan
 
         # Check that the n_roi is valid
@@ -40,7 +46,7 @@ class Tile:
             self.n = int(coordinates)
             self.x, self.y = self.n_to_position()
         elif (
-            (isinstance(coordinates, tuple) or isinstance(coordinates, list))
+            isinstance(coordinates, Sequence)
             and len(coordinates) == 2
             and all([np.issubdtype(type(coord), np.integer) for coord in coordinates])
         ):
@@ -93,7 +99,7 @@ class Tile:
             if y % 2 == 0:
                 n += x
             else:
-                n += self.scan.roi[0].tile_cols - x
+                n += (self.scan.roi[0].tile_cols - 1) - x
         else:
             raise ValueError(f"Scanner type {self.scan.scanner_id} not supported.")
         return n
@@ -230,7 +236,7 @@ class Tile:
     ) -> list[Self] | list[list[Self]]:
         """
         Gather a list of Tile objects based on the x, y bounds provided. The bounds are
-        exclusive, like indices, so the tiles at the corners are NOT included in the list.
+        exclusive, like indices, so the tiles at the far ends are NOT included in the list.
         :param scan: the scan metadata.
         :param bounds: a tuple of (x_0, y_0, x_1, y_1) in the scan axes.
         :param n_roi: the region of interest to use. Defaults to 0.

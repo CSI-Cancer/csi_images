@@ -58,12 +58,14 @@ def extract_mask_info(
             "centroid-1": "x",
         },
     )
+    # Also rename channel-specific columns if necessary
     renamings = {}
     for column in info.columns:
-        for i in range(len(image_labels)):
-            suffix = f"-{i}"
-            if column.endswith(suffix):
-                renamings[column] = f"{image_labels[i]}_{column[:-len(suffix)]}"
+        if column.find("-") != -1:
+            for i in range(len(image_labels)):
+                suffix = f"-{i}"
+                if column.endswith(suffix):
+                    renamings[column] = f"{image_labels[i]}_{column[:-len(suffix)]}"
     info = info.rename(columns=renamings)
 
     return info

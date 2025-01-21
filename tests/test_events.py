@@ -114,7 +114,7 @@ def test_get_crops(bzscan):
 
 def test_event_coordinates_for_bzscanner(bzscan):
     # Origin
-    tile = Tile(bzscan, 0)
+    tile = Tile(bzscan, (0, 0))
     event = Event(tile, 0, 0)
     scan_origin = event.get_scan_position()
     assert 2500 <= scan_origin[0] <= 3500
@@ -122,7 +122,7 @@ def test_event_coordinates_for_bzscanner(bzscan):
     scan_origin_on_slide = event.get_slide_position()
     assert 71500 <= scan_origin_on_slide[0] <= 72500
     assert 21500 <= scan_origin_on_slide[1] <= 22500
-    # Within the same tile, "top-right corner"
+    # Within the same tile, "top-right corner"; same x, reduces y (flipped)
     event = Event(tile, 1000, 0)
     scan_position = event.get_scan_position()
     assert scan_origin[0] < scan_position[0]
@@ -130,7 +130,7 @@ def test_event_coordinates_for_bzscanner(bzscan):
     slide_position = event.get_slide_position()
     assert scan_origin_on_slide[0] == slide_position[0]
     assert scan_origin_on_slide[1] > slide_position[1]
-    # Within the same tile, "bottom-left corner"
+    # Within the same tile, "bottom-left corner"; reduces x, same y
     event = Event(tile, 0, 1000)
     scan_position = event.get_scan_position()
     assert scan_origin[0] == scan_position[0]
@@ -139,15 +139,25 @@ def test_event_coordinates_for_bzscanner(bzscan):
     assert scan_origin_on_slide[0] > slide_position[0]
     assert scan_origin_on_slide[1] == slide_position[1]
 
-    # Next row, opposite side
-    tile = Tile(bzscan, (bzscan.roi[0].tile_cols - 1, 1))
-    event = Event(tile, 1000, 1000)
+    # Next tile, same row
+    tile = Tile(bzscan, (1, 0))
+    event = Event(tile, 0, 0)
     scan_position = event.get_scan_position()
-    assert scan_origin[0] <= scan_position[0]
-    assert scan_origin[1] <= scan_position[1]
+    assert scan_origin[0] < scan_position[0]
+    assert scan_origin[1] == scan_position[1]
     slide_position = event.get_slide_position()
-    assert slide_position[0] <= scan_origin_on_slide[0]
-    assert slide_position[1] <= scan_origin_on_slide[1]
+    assert slide_position[0] == scan_origin_on_slide[0]
+    assert slide_position[1] < scan_origin_on_slide[1]
+
+    # Next row, same column
+    tile = Tile(bzscan, (0, 1))
+    event = Event(tile, 0, 0)
+    scan_position = event.get_scan_position()
+    assert scan_origin[0] == scan_position[0]
+    assert scan_origin[1] < scan_position[1]
+    slide_position = event.get_slide_position()
+    assert slide_position[0] < scan_origin_on_slide[0]
+    assert slide_position[1] == scan_origin_on_slide[1]
 
     # Opposite corner
     tile = Tile(bzscan, (bzscan.roi[0].tile_cols - 1, bzscan.roi[0].tile_rows - 1))

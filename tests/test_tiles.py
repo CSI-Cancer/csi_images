@@ -40,22 +40,34 @@ def test_axioscan_tiles():
 
 def test_bzscanner_tiles():
     scan = Scan.load_txt("tests/data")
+    # Origin
     tile = Tile(scan, 0)
-    # Assert that the tile is in the top-left corner
-    assert tile.x == 0
-    assert tile.y == 0
+    assert (tile.x, tile.y) == (0, 0)
+    tile = Tile(scan, (0, 0))
+    assert tile.n == 0
     # Assert row-major indexing
-    tile = Tile(scan, scan.roi[0].tile_cols - 1)
-    assert tile.x == scan.roi[0].tile_cols - 1
-    assert tile.y == 0
+    tile = Tile(scan, 1)
+    assert (tile.x, tile.y) == (1, 0)
+    tile = Tile(scan, (1, 0))
+    assert tile.n == 1
     # Assert snake indexing
+    tile = Tile(scan, scan.roi[0].tile_cols - 1)
+    assert (tile.x, tile.y) == (scan.roi[0].tile_cols - 1, 0)
+    tile = Tile(scan, (scan.roi[0].tile_cols - 1, 0))
+    assert tile.n == scan.roi[0].tile_cols - 1
     tile = Tile(scan, scan.roi[0].tile_cols)
-    assert tile.x == scan.roi[0].tile_cols - 1
-    assert tile.y == 1
+    assert (tile.x, tile.y) == (scan.roi[0].tile_cols - 1, 1)
+    tile = Tile(scan, (scan.roi[0].tile_cols - 1, 1))
+    assert tile.n == scan.roi[0].tile_cols
     # Assert snake indexing again
-    tile = Tile(scan, 2 * scan.roi[0].tile_cols)
-    assert tile.x == 0
-    assert tile.y == 2
+    tile = Tile(scan, scan.roi[0].tile_cols * 2 - 1)
+    assert (tile.x, tile.y) == (0, 1)
+    tile = Tile(scan, (0, 1))
+    assert tile.n == scan.roi[0].tile_cols * 2 - 1
+    tile = Tile(scan, scan.roi[0].tile_cols * 2)
+    assert (tile.x, tile.y) == (0, 2)
+    tile = Tile(scan, (0, 2))
+    assert tile.n == scan.roi[0].tile_cols * 2
 
 
 def test_getting_tiles():

@@ -342,28 +342,14 @@ class Scan(yaml.YAMLObject):
         :param scan_dict: a dictionary
         :return: a Scan object
         """
-        local_timezone = zoneinfo.ZoneInfo("localtime")
-        if isinstance(scan_dict["start_datetime"], str):
-            start_datetime = datetime.datetime.strptime(
-                scan_dict["start_datetime"], cls.STANDARD_DATETIME_FORMAT
-            ).astimezone(local_timezone)
-        else:
-            start_datetime = scan_dict["start_datetime"].astimezone(local_timezone)
-        if isinstance(scan_dict["end_datetime"], str):
-            end_datetime = datetime.datetime.strptime(
-                scan_dict["end_datetime"], cls.STANDARD_DATETIME_FORMAT
-            ).astimezone(local_timezone)
-        else:
-            end_datetime = scan_dict["end_datetime"].astimezone(local_timezone)
-        dt = (end_datetime - start_datetime).total_seconds()
         result = cls(
             scanner_id=scan_dict["scanner_id"],
             slide_id=scan_dict["slide_id"],
             path=scan_dict["path"],
             exists=scan_dict["exists"],
-            start_datetime=start_datetime.strftime(cls.STANDARD_DATETIME_FORMAT),
-            end_datetime=end_datetime.strftime(cls.STANDARD_DATETIME_FORMAT),
-            scan_time_s=int(dt),
+            start_datetime=scan_dict["start_datetime"],
+            end_datetime=scan_dict["end_datetime"],
+            scan_time_s=scan_dict["scan_time_s"],
             tray_pos=scan_dict["tray_pos"],
             slide_pos=scan_dict["slide_pos"],
             camera=scan_dict["camera"],

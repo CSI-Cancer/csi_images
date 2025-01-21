@@ -1,11 +1,11 @@
 !<csi_utils.scans.Scan>
 slide_id: 0B68818_AXIOSCAN
-exists: true
+scanner_id: axioscan7_0
 path: /mnt/HDSCA_Development/data/OncoScope/tubeID_0B688/exptID_17988/slideID_0B68818_AXIOSCAN
+exists: true
 start_datetime: 2024-02-12T18:17:43-0800
 end_datetime: 2024-02-12T18:41:16-0800
 scan_time_s: 1413
-scanner_id: axioscan7_0
 tray_pos: 2
 slide_pos: 3
 camera: Orca
