@@ -16,7 +16,7 @@ if os.environ.get("DEBIAN_FRONTEND") == "noninteractive":
     SHOW_PLOTS = False
 else:
     # Change this to your preference for local testing, but commit as True
-    SHOW_PLOTS = False
+    SHOW_PLOTS = True
 
 
 @pytest.fixture
@@ -40,7 +40,7 @@ def circle():
 
 def test_get_crops(bzscan):
     tile = Tile(bzscan, 1000)
-    event = Event(tile, 400, 350)
+    event = Event(tile, 1086, 342)
 
     # Test a regular event
     images = event.get_crops()
@@ -333,7 +333,7 @@ def test_copy_sort_rows_get(axscan):
 
 def test_event_montages(bzscan, circle):
     tile = Tile(bzscan, 1000)
-    event = Event(tile, 515, 411)
+    event = Event(tile, 1086, 342)
     images = event.get_crops(crop_size=100)
 
     montage = csi_images.make_montage(
@@ -386,7 +386,7 @@ def test_saving_crops_and_montages(bzscan):
     tile = Tile(bzscan, 1000)
     tile2 = Tile(bzscan, 0)
     events = [
-        Event(tile, 515, 411),
+        Event(tile, 1086, 342),
         Event(tile2, 2, 1000),
         Event(tile, 1000, 1000),
         Event(tile2, 800, 800),

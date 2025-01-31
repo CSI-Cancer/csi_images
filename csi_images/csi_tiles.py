@@ -165,6 +165,11 @@ class Tile:
                 for y in range(scan.roi[n_roi].tile_rows):
                     for x in range(scan.roi[n_roi].tile_cols):
                         coordinates.append((x, y))
+            elif isinstance(coordinates, Sequence) and isinstance(coordinates[0], int):
+                # Convert n's to (x, y) coordinates
+                coordinates = [
+                    (cls(scan, n, n_roi).x, cls(scan, n, n_roi).y) for n in coordinates
+                ]
             # Check that the coordinates are contiguous, otherwise we can't make a grid
             # Find the min and max x, y values
             x_min = scan.roi[n_roi].tile_cols
@@ -184,10 +189,11 @@ class Tile:
                     "a grid; number of coordinates does not match."
                 )
 
-            tiles = [[None] * (x_max - x_min + 1)] * (y_max - y_min + 1)
+            # Create a list based on number of rows
+            tiles = [[None] * (x_max - x_min + 1) for _ in range(y_max - y_min + 1)]
             for coordinate in coordinates:
                 x, y = coordinate
-                tiles[y][x] = cls(scan, coordinate, n_roi)
+                tiles[y - y_min][x - x_min] = cls(scan, coordinate, n_roi)
 
         return tiles
 

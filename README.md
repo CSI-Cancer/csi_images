@@ -41,29 +41,34 @@ This package contains these modules:
       Recommend importing via `from csi_images.csi_scans import Scan`
 2. `csi_tiles.py`: a module for interacting with tiles, which have a particular (x, y)
    position in the scan. Tiles have several frames taken at the same position.
-    * `Tile`: a class for containing a tile's positional data. Imports `csi_scans.py`.
-      This class unifies multiple scanners' tile positioning to convert between index
-      and (x, y). Recommend importing via `from csi_images.csi_tiles import Tile`
+    * `Tile`: a class for containing a tile's positional data. Includes a reference to a
+      `Scan`. This class unifies multiple scanners' tile positioning to convert between
+      index and (x, y). Recommend importing via `from csi_images.csi_tiles import Tile`
 3. `csi_frames.py`: a module for interacting with frames, which are individual images.
    Imports `csi_scans.py` and `csi_tiles.py`. Recommend importing via
    `from csi_images.csi_frames import Frame`
-    * `Frame`: a class for containing a frame's metadata. Each frame in a tile has a
-      different channel, or light spectrum. The frame **only contains metadata**, but
-      enables gathering of the image data through the `get_image()` method. For a list
-      of frames, use `get_frames()`. For all frames in a scan, use `get_all_frames()`.
-      For many frames, use `[frame.get_image() for frame in frames]`. Recommend
-      importing via `from csi_images.csi_frames import Frame`
+    * `Frame`: a class for containing a frame's metadata. Includes a reference to a
+      `Tile`. For a list of frames for a tile, use `get_frames(tile)`. For
+      all frames in a scan, use `get_all_frames(scan)`. Each frame in a tile has a
+      different channel, or light spectrum. The frame **only contains metadata**,
+      but enables gathering of the image data through the `get_image()` method. For
+      many frames, use `[frame.get_image() for frame in frames]`. Recommend importing
+      via `from csi_images.csi_frames import Frame`
 4. `csi_events.py`: a module for interacting with individual events. Imports
    `csi_scans.py`, `csi_tiles.py`, and `csi_frames.py`.
     * `Event`: a class for containing a single event's metadata and feature data. Key
       metadata (scan, tile, x, y) is required; the others are optional and flexible.
-      Contains a convenience function for getting crops of an event, as well as
-      functions for determining the position of the event in the slide coordinate frame.
-      Recommend importing via `from csi_images.csi_events import Event`
+      Contains functions for determining event position in different coordinate frames
+      and performing crop and montage image manipulations, as well as name conventions
+      for saving crops and images. Recommend importing via
+      `from csi_images.csi_events import Event`
     * `EventArray`: a class for containing a list of events, holding their data in
-      pandas dataframes. Contains functions converting back and forth from `Event`s and
+      Pandas DataFrames. Contains functions converting back and forth from `Event`s and
       files. Recommend importing via `from csi_images.csi_events import EventArray`
-5. `csi_images.py`: a module for image manipulation functions.
+5. `csi_images.py`: a module for image manipulation functions. These functions are
+   developed to be portable and contain all of the image-related dependencies, making it
+   possible to use the other modules without image-related dependencies. Recommend
+   importing via `from csi_images import csi_images`
 
 ## Documentation
 

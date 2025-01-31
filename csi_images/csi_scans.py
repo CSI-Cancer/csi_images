@@ -28,7 +28,7 @@ class Scan(yaml.YAMLObject):
     .. include:: ../docs/coordinate_systems.md
     """
 
-    yaml_tag = "csi_utils.scans.Scan"
+    yaml_tag = "csi_images.csi_scans.Scan"
 
     class Type(enum.Enum):
         BZSCANNER = "bzscanner"
@@ -65,7 +65,7 @@ class Scan(yaml.YAMLObject):
         - intensity: the light intensity used OR the gain applied to the channel
         """
 
-        yaml_tag = "csi_utils.csi_scans.Scan.Channel"
+        yaml_tag = "csi_images.csi_scans.Scan.Channel"
 
         def __init__(
             self,
@@ -90,7 +90,7 @@ class Scan(yaml.YAMLObject):
         Class that comprises an ROI; we usually have 1, but may have more in a scan.
         """
 
-        yaml_tag = "csi_utils.csi_scans.Scan.ROI"
+        yaml_tag = "csi_images.csi_scans.Scan.ROI"
 
         def __init__(
             self,
@@ -321,6 +321,7 @@ class Scan(yaml.YAMLObject):
             "path": self.path,
             "start_datetime": self.start_datetime,
             "end_datetime": self.end_datetime,
+            "scan_time_s": self.scan_time_s,
             "tray_pos": self.tray_pos,
             "slide_pos": self.slide_pos,
             "tile_width": self.tile_width_px,

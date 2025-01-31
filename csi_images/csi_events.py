@@ -1179,7 +1179,7 @@ class EventArray:
         metadata = pd.DataFrame(
             {
                 "slide_id": self.info["slide_id"],
-                "frame_id": self.info["tile"],
+                "frame_id": self.info["tile"] + 1,  # Convert to 1-indexed for R
                 "cell_id": (
                     self.metadata["cell_id"]
                     if "cell_id" in self.metadata.columns
@@ -1479,4 +1479,5 @@ class EventArray:
         for col in ["catalogue_id", "catalogue_distance", "clust", "hcpc"]:
             if col in metadata:
                 metadata[col] = metadata[col].fillna(-1).astype(int)
+        info["tile"] = info["tile"] - 1  # Convert to 0-based indexing
         return EventArray(info, metadata, features)

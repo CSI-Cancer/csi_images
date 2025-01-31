@@ -140,7 +140,11 @@ class Frame:
         if image is None or image.size == 0:
             raise ValueError(f"Could not load image from {file_path}")
         if apply_gain and not self.tile.scan.channels[self.channel].gain_applied:
+            # Multiply by the gain if it hasn't been applied, avoiding overflow
+            dtype = image.dtype
+            image = image.astype(np.uint32)
             image = image * self.tile.scan.channels[self.channel].intensity
+            image = np.clip(image, 0, np.iinfo(dtype).max).astype(dtype)
         return image
 
     @staticmethod
