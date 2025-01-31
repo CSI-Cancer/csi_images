@@ -19,7 +19,7 @@ pip install csi_images
 or
 
 ```bash
-pip install csi_images[imageio,rds,dev,all]
+pip install csi_images[imageio,rds,dev]
 ```
 
 The base version of the package includes only core data structures and manipulations.
@@ -29,7 +29,6 @@ Optional dependencies include:
 * `imageio`: for reading and writing images, include .czi files.
 * `rds`: for reading and writing RDS files, such as OCULAR outputs.
 * `dev`: for development dependencies, including documentation, tests, building, etc.
-* `all`: for all optional dependencies.
 
 ## Structure
 
@@ -94,15 +93,10 @@ docs/make_docs.sh
 ```bash
 cd ~/path/to/your/repositories
 git clone git@github.com:CSI-Cancer/csi_images.git
-pip install ./csi_images
+pip install -r requirements.txt
 ```
 
-Alternatively, you can "editable" install the package, which will allow you to make
-changes to the package and have them reflected in your environment without reinstalling:
+This installs the package in "editable" mode, as well as all dependencies and
+development dependencies (e.g. `pytest`, `pdoc`, etc.).
 
-```bash
-pip install -e ./csi_images
-```
-
-This will add symbolic links to your `site-packages` directory instead of copying the
-package files over.
+You may also use the `requirements-versioned.txt` file to install known good versions.

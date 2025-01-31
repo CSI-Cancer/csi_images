@@ -1,17 +1,20 @@
--e .[all]
+-e .
 
 pandas
 numpy
 tables
 PyYAML
+
+imageio
 aicspylibczi
 tifffile[codecs]
-imageio
 scikit-image
 opencv-python
 Pillow
+
 pyreadr
 
+pdoc
 pytest
 pytest-cov
 coverage

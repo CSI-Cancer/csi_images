@@ -1,6 +1,6 @@
 [project]
 name = "csi_images"
-version = "3.0.0"
+version = "3.0.1"
 description = "CSI-Cancer image-related data structures and basic processing."
 requires-python = ">=3.11"
 authors = [
@@ -21,27 +21,15 @@ dependencies = [
 
 [project.optional-dependencies]
 imageio = [
+    "imageio",
     "aicspylibczi",
     "tifffile[codecs]",
     "scikit-image",
     "opencv-python",
     "Pillow",
-    "imageio",
 ]
 rds = [
     "pyreadr",
-]
-dev = [
-    "pdoc",
-    "pytest",
-    "hatchling",
-    "build",
-    "twine",
-]
-all = [
-    "csi_images[imageio]",
-    "csi_images[rds]",
-    "csi_images[dev]",
 ]
 
 [project.urls]
@@ -54,7 +42,7 @@ build-backend = "hatchling.build"
 
 [tool.pytest.ini_options]
 minversion = "7.0"
-addopts = "-ra -q --junitxml=junit.xml --cov=. --cov-config=.coveragerc --cov-report=xml"
+#addopts = "-ra -q --junitxml=junit.xml --cov=. --cov-config=.coveragerc --cov-report=xml"
 testpaths = [
     "tests",
 ]
