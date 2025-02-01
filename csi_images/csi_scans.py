@@ -72,7 +72,7 @@ class Scan(yaml.YAMLObject):
             name: str = "",
             exposure_ms: float = -1.0,
             intensity: float = -1.0,
-            gain_applied: bool = False,
+            gain_applied: bool = True,
         ):
             self.name = name
             self.exposure_ms = exposure_ms
@@ -763,6 +763,7 @@ class Scan(yaml.YAMLObject):
         :param n_tile: the number of this tile, which will become the number of
                        tiles in the scan
         :param n_roi: the number of ROIs in the scan
+        :param scanner_type: the scanner type
         :return: a Scan object
         """
         # Sanitize inputs here
@@ -774,9 +775,24 @@ class Scan(yaml.YAMLObject):
         scan.slide_id = slide_id
         if scanner_type == cls.Type.AXIOSCAN7:
             scan.scanner_id = f"{cls.Type.AXIOSCAN7.value}_placeholder"
+            scan.roi = [cls.ROI() for _ in range(n_roi + 1)]
+            scan.roi[0].tile_rows = 17
+            scan.roi[0].tile_cols = (n_tile // 17) + 1
+            scan.channels = [
+                cls.Channel(name="DAPI", exposure_ms=1.0, intensity=1.0),
+                cls.Channel(name="AF488", exposure_ms=1.0, intensity=1.0),
+                cls.Channel(name="AF555", exposure_ms=1.0, intensity=1.0),
+                cls.Channel(name="AF647", exposure_ms=1.0, intensity=1.0),
+            ]
         elif scanner_type == cls.Type.BZSCANNER:
             scan.scanner_id = f"{cls.Type.BZSCANNER.value}_placeholder"
-        scan.roi = [cls.ROI() for _ in range(n_roi + 1)]
-        scan.roi[0].tile_rows = 1
-        scan.roi[0].tile_cols = n_tile + 1
+            scan.roi = [cls.ROI() for _ in range(n_roi + 1)]
+            scan.roi[0].tile_rows = 96
+            scan.roi[0].tile_cols = 24
+            scan.channels = [
+                cls.Channel(name="DAPI", exposure_ms=1.0, intensity=1.0),
+                cls.Channel(name="AF555", exposure_ms=1.0, intensity=1.0),
+                cls.Channel(name="AF647", exposure_ms=1.0, intensity=1.0),
+                cls.Channel(name="AF488", exposure_ms=1.0, intensity=1.0),
+            ]
         return scan

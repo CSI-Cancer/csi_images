@@ -1119,18 +1119,25 @@ class EventArray:
         df = pd.read_csv(input_path)
         return cls.from_dataframe(df, metadata_prefix, features_prefix)
 
-    def save_hdf5(self, output_path: str) -> bool:
+    def save_hdf5(
+        self, output_path: str, complevel: int = 1, complib="blosc:zstd"
+    ) -> bool:
         """
         Save the events to an HDF5 file, including metadata and features.
         Uses the pandas-provided HDF5 functions for ease, and external compatibility,
         though these files are slightly harder to view in HDFView or similar.
+        Compression defaults remain very quick while cutting file size by 50%+.
         :param output_path:
+        :param complevel: see pandas.HDFStore for more details.
+        :param complib: see pandas.HDFStore for more details.
         :return:
         """
         if not output_path.endswith(".hdf5") and not output_path.endswith(".h5"):
             output_path += ".hdf5"
         # Open the output_path as an HDF5 file
-        with pd.HDFStore(output_path) as store:
+        with pd.HDFStore(
+            output_path, mode="w", complevel=complevel, complib=complib
+        ) as store:
             # Store the dataframes in the HDF5 file
             if self.info is not None:
                 store.put("info", self.info, index=False)

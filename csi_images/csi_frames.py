@@ -173,9 +173,9 @@ class Frame:
                 if min_value < 0:
                     raise ValueError(f"{min_name} is less than 0; unexpected .tags")
                 # Return to [0, 1], scale + offset, then return to a 16-bit image
-                image = image / np.iinfo(image.dtype).max
+                image = csi_images.scale_bit_depth(image, np.float64)
                 image = image * (max_value - min_value) + min_value
-                image = (image * np.iinfo(np.uint16).max).astype(np.uint16)
+                image = csi_images.scale_bit_depth(image, np.uint16)
             else:
                 raise ValueError(
                     f"Could not find {min_name} and {max_name} in .tags file."
