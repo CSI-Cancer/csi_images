@@ -295,8 +295,8 @@ class Event:
 
     def get_montage_channels(
         self,
-        channels: Sequence[int | str] | None,
-        composites: dict[int | str, tuple[float, float, float]] | None,
+        channels: Sequence[int | str] | None = None,
+        composites: dict[int | str, tuple[float, float, float]] | None = None,
     ) -> tuple[list[int], list[int], dict[int, tuple[float, float, float]]]:
         """
         Get the channel names for the montage from the event's tile.
@@ -359,6 +359,7 @@ class Event:
         :param channels: the channels to use for black-and-white montages.
         :param composites: dictionary of indices and RGB tuples for a composite.
         :param mask: a mask to apply to the montage. Must be the same size as the crop.
+        :param labels: the labels to subtitle montage images, usually the channel names
         :param crop_size: the square size of the image crop to get for this event.
         :param in_pixels: whether the crop size is in pixels or micrometers. Defaults to pixels.
         :param input_path: the path to the input images. Defaults to None (uses the scan's path).
@@ -630,6 +631,10 @@ class EventArray:
         metadata: pd.DataFrame = None,
         features: pd.DataFrame = None,
     ):
+        self.info = info
+        self.metadata = None
+        self.features = None
+
         # Info must be a DataFrame with columns "slide_id", "tile", "roi", "x", "y"
         if info is not None:
             # Special case: "roi" is often not required, so we'll fill in if its missing
@@ -650,6 +655,7 @@ class EventArray:
             info["y"] = info["y"].round().astype(np.uint16)
             # Ensure that the columns are in the right order
             info = info[self.INFO_COLUMNS]
+
         # All DataFrames must all have the same number of rows
         if metadata is not None and (info is None or len(info) != len(metadata)):
             raise ValueError(
@@ -672,9 +678,11 @@ class EventArray:
         if any([col.lower() == "none" for col in column_names]):
             raise ValueError("EventArray column names cannot be 'none'")
 
-        self.info = info
-        self.metadata = metadata
-        self.features = features
+        # Add the metadata and features
+        if metadata is not None:
+            self.add_metadata(metadata)
+        if features is not None:
+            self.add_features(features)
 
     def __len__(self) -> int:
         # Convenience method to get the number of events
@@ -812,17 +820,28 @@ class EventArray:
         Overwrites any existing metadata with the same column names as the new metadata.
         :param new_metadata: the metadata to add.
         """
-        if len(self) != len(new_metadata):
+        if self.info is None or len(self.info) != len(new_metadata):
             raise ValueError("New metadata must match length of existing info")
+
+        if isinstance(new_metadata, pd.Series):
+            # Convert to a DataFrame
+            new_metadata = pd.DataFrame(new_metadata)
+
+        for col in new_metadata.columns:
+            if col in self.INFO_COLUMNS:
+                raise ValueError(f"Column name {col} is reserved for info")
+            elif self.metadata is not None and col in self.metadata.columns:
+                warnings.warn(f"Overwriting existing metadata {col}.")
+            elif self.features is not None and col in self.features.columns:
+                raise ValueError(
+                    f"Column name {col} already exists in features;"
+                    f"EventArray cannot have duplicate column names"
+                )
 
         if self.metadata is None:
             self.metadata = new_metadata
         else:
-            if isinstance(new_metadata, pd.Series):
-                self.metadata[new_metadata.name] = new_metadata
-            else:
-                # It's a DataFrame
-                self.metadata[new_metadata.columns] = new_metadata
+            self.metadata.loc[:, new_metadata.columns] = new_metadata
 
     def add_features(self, new_features: pd.Series | pd.DataFrame) -> None:
         """
@@ -830,17 +849,28 @@ class EventArray:
         Overwrites any existing features with the same column names as the new features.
         :param new_features: the features to add.
         """
-        if len(self) != len(new_features):
+        if self.info is None or len(self.info) != len(new_features):
             raise ValueError("New features must match length of existing info")
+
+        if isinstance(new_features, pd.Series):
+            # Convert to a DataFrame
+            new_features = pd.DataFrame(new_features)
+
+        for col in new_features.columns:
+            if col in self.INFO_COLUMNS:
+                raise ValueError(f"Column name {col} is reserved for info")
+            elif self.metadata is not None and col in self.metadata.columns:
+                raise ValueError(
+                    f"Column name {col} already exists in metadata;"
+                    f"EventArray cannot have duplicate column names"
+                )
+            elif self.features is not None and col in self.features.columns:
+                warnings.warn(f"Overwriting existing feature {col}.")
 
         if self.features is None:
             self.features = new_features
         else:
-            if isinstance(new_features, pd.Series):
-                self.features[new_features.name] = new_features
-            else:
-                # It's a DataFrame
-                self.features[new_features.columns] = new_features
+            self.features.loc[:, new_features.columns] = new_features
 
     @classmethod
     def merge(cls, events: Iterable[Self]) -> Self:
@@ -1117,6 +1147,36 @@ class EventArray:
         """
         # Load the CSV file
         df = pd.read_csv(input_path)
+        return cls.from_dataframe(df, metadata_prefix, features_prefix)
+
+    def save_json(self, output_path: str, orient: str = "records") -> bool:
+        """
+        Save the events to a JSON file, including metadata and features.
+        :param output_path:
+        :param orient: the orientation of the JSON file, see pandas.DataFrame.to_json()
+        :return:
+        """
+        if not output_path.endswith(".json"):
+            output_path += ".json"
+        self.to_dataframe().to_json(output_path, orient=orient, indent=2)
+        return os.path.exists(output_path)
+
+    @classmethod
+    def load_json(
+        cls,
+        input_path: str,
+        metadata_prefix: str = "metadata_",
+        features_prefix: str = "features_",
+    ) -> Self:
+        """
+        Load the events from a JSON file, including metadata and features.
+        :param input_path:
+        :param metadata_prefix:
+        :param features_prefix:
+        :return:
+        """
+        # Load the JSON file
+        df = pd.read_json(input_path, orient="records")
         return cls.from_dataframe(df, metadata_prefix, features_prefix)
 
     def save_hdf5(

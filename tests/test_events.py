@@ -331,6 +331,34 @@ def test_copy_sort_rows_get(axscan):
     assert events_get.info["y"].equals(pd.Series([2000, 0, 100], dtype=np.uint16))
 
 
+def test_adding_metadata_features(axscan):
+    # Origin
+    tile = Tile(axscan, 0)
+    events = [
+        Event(tile, 0, 100),
+        Event(tile, 0, 0),
+        Event(tile, 1000, 1000),
+        Event(tile, 1000, 1),
+        Event(tile, 2000, 2000),
+    ]
+
+    events = EventArray.from_events(events)
+
+    # Add metadata
+    events.add_metadata(pd.DataFrame({"test": [1, 2, 3, 4, 5]}))
+    assert events.get("test").equals(pd.DataFrame({"test": [1, 2, 3, 4, 5]}))
+    # Add again
+    events.add_metadata(pd.DataFrame({"test": [5, 4, 3, 2, 1]}))
+    assert events.get("test").equals(pd.DataFrame({"test": [5, 4, 3, 2, 1]}))
+
+    # Add features
+    events.add_features(pd.DataFrame({"test2": [1, 2, 3, 4, 5]}))
+    assert events.get("test2").equals(pd.DataFrame({"test2": [1, 2, 3, 4, 5]}))
+    # Add again
+    events.add_features(pd.DataFrame({"test2": [5, 4, 3, 2, 1]}))
+    assert events.get("test2").equals(pd.DataFrame({"test2": [5, 4, 3, 2, 1]}))
+
+
 def test_event_montages(bzscan, circle):
     tile = Tile(bzscan, 1000)
     event = Event(tile, 1086, 342)
@@ -432,3 +460,38 @@ def test_saving_crops_and_montages(bzscan):
     for file in os.listdir("temp"):
         os.remove(os.path.join("temp", file))
     os.rmdir("temp")
+
+
+def test_saving_and_loading(axscan):
+    # Origin
+    tile = Tile(axscan, 0)
+    events = [
+        Event(tile, 0, 100),
+        Event(tile, 0, 0),
+        Event(tile, 1000, 1000),
+        Event(tile, 1000, 1),
+        Event(tile, 2000, 2000),
+    ]
+
+    events = EventArray.from_events(events)
+
+    # Add content
+    events.add_metadata(pd.DataFrame({"test": [1, 2, 3, 4, 5]}))
+
+    # Add features
+    events.add_features(pd.DataFrame({"test2": [1, 2, 3, 4, 5]}))
+
+    # Save and load
+    assert events.save_csv("tests/data/events.csv")
+    assert events == EventArray.load_csv("tests/data/events.csv")
+
+    assert events.save_json("tests/data/events.json")
+    assert events == EventArray.load_json("tests/data/events.json")
+
+    assert events.save_hdf5("tests/data/events.h5")
+    assert events == EventArray.load_hdf5("tests/data/events.h5")
+
+    # Clean up
+    os.remove("tests/data/events.csv")
+    os.remove("tests/data/events.json")
+    os.remove("tests/data/events.h5")
