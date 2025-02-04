@@ -631,30 +631,28 @@ class EventArray:
         metadata: pd.DataFrame = None,
         features: pd.DataFrame = None,
     ):
-        self.info = info
-        self.metadata = None
-        self.features = None
 
         # Info must be a DataFrame with columns "slide_id", "tile", "roi", "x", "y"
-        if info is not None:
+        self.info = info
+        if self.info is not None:
             # Special case: "roi" is often not required, so we'll fill in if its missing
             if "roi" not in info.columns:
-                info["roi"] = 0
-            if set(info.columns) != set(self.INFO_COLUMNS):
+                self.info = self.info.assign(roi=0)
+            if set(self.info.columns) != set(self.INFO_COLUMNS):
                 raise ValueError(
                     f"EventArray.info must have columns:"
-                    f"{self.INFO_COLUMNS}; had {list(info.columns)}"
+                    f"{self.INFO_COLUMNS}; had {list(self.info.columns)}"
                 )
-            # Copy first to avoid modifying the original
-            info = info.copy()
-            # Ensure that the columns are the right types
-            info["slide_id"] = info["slide_id"].astype(str)
-            info["tile"] = info["tile"].astype(np.uint16)
-            info["roi"] = info["roi"].astype(np.uint8)
-            info["x"] = info["x"].round().astype(np.uint16)
-            info["y"] = info["y"].round().astype(np.uint16)
-            # Ensure that the columns are in the right order
-            info = info[self.INFO_COLUMNS]
+            # Ensure order and data types
+            self.info = pd.DataFrame(
+                {
+                    "slide_id": self.info["slide_id"].astype(str),
+                    "tile": self.info["tile"].astype(np.uint16),
+                    "roi": self.info["roi"].astype(np.uint8),
+                    "x": self.info["x"].round().astype(np.uint16),
+                    "y": self.info["y"].round().astype(np.uint16),
+                }
+            )
 
         # All DataFrames must all have the same number of rows
         if metadata is not None and (info is None or len(info) != len(metadata)):
@@ -678,7 +676,9 @@ class EventArray:
         if any([col.lower() == "none" for col in column_names]):
             raise ValueError("EventArray column names cannot be 'none'")
 
-        # Add the metadata and features
+        # Add metadata and features
+        self.metadata = None
+        self.features = None
         if metadata is not None:
             self.add_metadata(metadata)
         if features is not None:
@@ -829,13 +829,14 @@ class EventArray:
 
         for col in new_metadata.columns:
             if col in self.INFO_COLUMNS:
-                raise ValueError(f"Column name {col} is reserved for info")
-            elif self.metadata is not None and col in self.metadata.columns:
-                warnings.warn(f"Overwriting existing metadata {col}.")
+                warnings.warn(
+                    f"Column name {col} is reserved for info; you can only "
+                    "access this column through the .metadata attribute"
+                )
             elif self.features is not None and col in self.features.columns:
-                raise ValueError(
-                    f"Column name {col} already exists in features;"
-                    f"EventArray cannot have duplicate column names"
+                warnings.warn(
+                    f"Column name {col} also exists in the .features attribute; "
+                    f"calling this.get({col}) will return the .metadata column"
                 )
 
         if self.metadata is None:
@@ -858,14 +859,15 @@ class EventArray:
 
         for col in new_features.columns:
             if col in self.INFO_COLUMNS:
-                raise ValueError(f"Column name {col} is reserved for info")
-            elif self.metadata is not None and col in self.metadata.columns:
-                raise ValueError(
-                    f"Column name {col} already exists in metadata;"
-                    f"EventArray cannot have duplicate column names"
+                warnings.warn(
+                    f"Column name {col} is reserved for info; you can only "
+                    "access this column through the .features attribute"
                 )
-            elif self.features is not None and col in self.features.columns:
-                warnings.warn(f"Overwriting existing feature {col}.")
+            elif self.metadata is not None and col in self.metadata.columns:
+                warnings.warn(
+                    f"Column name {col} already exists in the .metadata attribute;"
+                    f"calling this.get({col}) will return the .metadata column"
+                )
 
         if self.features is None:
             self.features = new_features
