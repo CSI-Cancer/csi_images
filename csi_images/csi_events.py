@@ -865,7 +865,7 @@ class EventArray:
                 )
             elif self.metadata is not None and col in self.metadata.columns:
                 warnings.warn(
-                    f"Column name {col} already exists in the .metadata attribute;"
+                    f"Column name {col} already exists in the .metadata attribute; "
                     f"calling this.get({col}) will return the .metadata column"
                 )
 
@@ -1014,9 +1014,13 @@ class EventArray:
             features = pd.DataFrame(features_list)
         return EventArray(info=info, metadata=metadata, features=features)
 
-    def to_dataframe(self) -> pd.DataFrame:
+    def to_dataframe(
+        self, metadata_prefix="metadata_", features_prefix="features_"
+    ) -> pd.DataFrame:
         """
         Convert all the data in the EventArray to a single DataFrame.
+        :param metadata_prefix: the prefix for metadata columns.
+        :param features_prefix: the prefix for features columns.
         :return: a DataFrame with all the data in the EventArray.
         """
         # Make a copy of the info DataFrame and prepend "info_" to the column names
@@ -1024,12 +1028,12 @@ class EventArray:
         # Combine with the metadata and prepend "metadata_" to the column names
         if self.metadata is not None:
             metadata = self.metadata.copy()
-            metadata.columns = [f"metadata_{col}" for col in metadata.columns]
+            metadata.columns = [f"{metadata_prefix}{col}" for col in metadata.columns]
             output = pd.concat([output, metadata], axis=1)
         # Combine with the features and prepend "features_" to the column names
         if self.features is not None:
             features = self.features.copy()
-            features.columns = [f"features_{col}" for col in features.columns]
+            features.columns = [f"{features_prefix}{col}" for col in features.columns]
             output = pd.concat([output, features], axis=1)
         return output
 
@@ -1179,6 +1183,37 @@ class EventArray:
         """
         # Load the JSON file
         df = pd.read_json(input_path, orient="records")
+        return cls.from_dataframe(df, metadata_prefix, features_prefix)
+
+    def save_parquet(self, output_path: str, compression="zstd") -> bool:
+        """
+        Save the events to a Parquet file, including metadata and features.
+        Best compression and preferred method for transferring EventArrays.
+        :param output_path: the path to save the Parquet file.
+        :param compression: see pandas.DataFrame.to_parquet() for more details.
+        :return:
+        """
+        if not output_path.endswith(".parquet"):
+            output_path += ".parquet"
+        self.to_dataframe().to_parquet(output_path, compression=compression)
+        return os.path.exists(output_path)
+
+    @classmethod
+    def load_parquet(
+        cls,
+        input_path: str,
+        metadata_prefix: str = "metadata_",
+        features_prefix: str = "features_",
+    ) -> Self:
+        """
+        Load the events from a Parquet file, including metadata and features.
+        :param input_path:
+        :param metadata_prefix:
+        :param features_prefix:
+        :return:
+        """
+        # Load the Parquet file
+        df = pd.read_parquet(input_path)
         return cls.from_dataframe(df, metadata_prefix, features_prefix)
 
     def save_hdf5(

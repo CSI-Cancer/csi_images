@@ -1,6 +1,6 @@
 -e .
 
-pandas
+pandas[pyarrow]
 numpy
 tables
 PyYAML

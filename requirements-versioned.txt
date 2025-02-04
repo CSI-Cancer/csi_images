@@ -1,4 +1,3 @@
--e csi_images @ file://.
 aicspylibczi==3.2.1
 anyio==4.8.0
 blosc2==3.0.0
@@ -9,6 +8,7 @@ charset-normalizer==3.4.1
 click==8.1.8
 coverage==7.6.10
 cryptography==44.0.0
+-e git+ssh://git@github.com/CSI-Cancer/csi_images.git@012541cd6f46eea8f63332634a85cc828cfb589e#egg=csi_images
 defusedxml==0.7.1
 docutils==0.21.2
 genbadge==1.1.1
@@ -46,6 +46,7 @@ pdoc==15.0.1
 pillow==11.1.0
 pluggy==1.5.0
 py-cpuinfo==9.0.0
+pyarrow==19.0.0
 pycparser==2.22
 Pygments==2.19.1
 pyproject_hooks==1.2.0
