@@ -165,11 +165,12 @@ def make_rgb(
     rgb = np.zeros((*dims, 3), dtype=temp_dtype)
 
     # Combine images with colors (can also be thought of as gains)
-    for image, color in zip(images, colors):
+    for idx, (image, color) in enumerate(zip(images, colors)):
         if image.shape != dims:
             raise ValueError("All images must have the same shape.")
         if image.dtype != dtype:
             raise ValueError("All images must have the same dtype.")
+        
         rgb += np.stack([image * c for c in color], axis=-1).astype(temp_dtype)
 
     # Cut off any overflow and convert back to original dtype
@@ -192,6 +193,24 @@ def make_rgb(
 
     return rgb
 
+def gain_image(image: np.ndarray, gain: float) -> np.ndarray:
+    """
+    Applies a gain to an image.
+    :param image: numpy array representing the image.
+    :param gain: gain to apply to the image.
+    :return: numpy array representing the image with the gain applied.
+    """
+    dtype = image.dtype
+    if dtype == np.uint8:
+        temp_dtype = np.uint16
+    elif dtype == np.uint16:
+        temp_dtype = np.uint32
+    else:
+        temp_dtype = np.float64
+    max_value = np.iinfo(dtype).max
+    image = image.astype(temp_dtype) * gain
+    image = np.clip(image, 0, max_value).astype(dtype)
+    return image
 
 def make_montage(
     images: list[np.ndarray],
@@ -208,6 +227,8 @@ def make_montage(
     border_size: int = 1,
     horizontal: bool = True,
     dtype=np.uint8,
+    apply_gain: bool = False,
+    gain: tuple[float, float, float, float] = (1, 1, 1, 1),
 ) -> np.ndarray:
     """
     Combine multiple images into a single montage based on order.
@@ -250,6 +271,9 @@ def make_montage(
     if isinstance(label_size, float):
         label_size = int(images[0].shape[1] * label_size)
 
+    # Apply gain if desired
+    if apply_gain:
+        images = [gain_image(image, gain[i]) for i, image in enumerate(images)]
     # Populate the montage with black
     montage = np.full(
         get_montage_shape(images[0].shape, n_images, border_size, horizontal),
@@ -276,6 +300,8 @@ def make_montage(
     # Populate the montage with images
     offset = border_size  # Keeps track of the offset for the next image
     image_height, image_width = images[0].shape
+
+    #
 
     # Composite first
     if composites is not None and len(composites) > 0:
