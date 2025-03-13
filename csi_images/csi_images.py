@@ -311,8 +311,6 @@ def make_montage(
             mask,
             mask_mode,
             overlay_color,
-            apply_gain,
-            gain,
         )
 
         if labels is not None and len(labels) == n_images:
