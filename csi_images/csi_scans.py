@@ -19,6 +19,15 @@ try:
 except ImportError:
     aicspylibczi = None
 
+def scanMetadata_constructor(loader, node):
+            return loader.construct_mapping(node)
+
+def channelMetadata_constructor(loader, node):
+            return loader.construct_mapping(node)
+
+yaml.add_constructor('czi_metadata.ScanMetadata', scanMetadata_constructor)
+yaml.add_constructor('czi_metadata.ChannelMetadata', channelMetadata_constructor)
+
 
 class Scan(yaml.YAMLObject):
     """
