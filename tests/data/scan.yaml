@@ -1,6 +1,6 @@
 !<csi_images.csi_scans.Scan>
 slide_id: 0B68818_AXIOSCAN
-scanner_id: axioscan7_0
+scanner_id: Scanner7
 path: /mnt/HDSCA_Development/data/OncoScope/tubeID_0B688/exptID_17988/slideID_0B68818_AXIOSCAN
 exists: true
 start_datetime: 2024-02-12T18:17:43-0800

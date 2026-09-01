@@ -92,9 +92,10 @@ class Tile:
         if position == (-1, -1):
             position = self.x, self.y
         x, y = position
-        if self.scan.scanner_id.startswith(self.scan.Type.AXIOSCAN7.value):
+        scanner_type = self.scan.get_scanner_type()
+        if scanner_type == self.scan.Type.AXIOSCAN7:
             n = y * self.scan.roi[self.n_roi].tile_cols + x
-        elif self.scan.scanner_id.startswith(self.scan.Type.BZSCANNER.value):
+        elif scanner_type == self.scan.Type.BZSCANNER:
             n = y * self.scan.roi[self.n_roi].tile_cols
             if y % 2 == 0:
                 n += x
@@ -116,11 +117,12 @@ class Tile:
             n = self.n
         if n < 0:
             raise ValueError(f"n ({n}) must be non-negative.")
-        if self.scan.scanner_id.startswith(self.scan.Type.AXIOSCAN7.value):
+        scanner_type = self.scan.get_scanner_type()
+        if scanner_type == self.scan.Type.AXIOSCAN7:
             x = n % self.scan.roi[0].tile_cols
             y = n // self.scan.roi[0].tile_cols
             return x, y
-        elif self.scan.scanner_id.startswith(self.scan.Type.BZSCANNER.value):
+        elif scanner_type == self.scan.Type.BZSCANNER:
             y = n // self.scan.roi[0].tile_cols
             if y % 2 == 0:
                 x = n % self.scan.roi[0].tile_cols

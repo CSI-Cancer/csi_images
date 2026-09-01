@@ -82,12 +82,13 @@ class Frame:
         :param ext: the image file extension. Defaults to .tif.
         :return: the file name.
         """
-        if self.tile.scan.scanner_id.startswith(Scan.Type.AXIOSCAN7.value):
+        scanner_type = self.tile.scan.get_scanner_type()
+        if scanner_type == Scan.Type.AXIOSCAN7:
             channel_name = self.tile.scan.channels[self.channel].name
             x = self.tile.x
             y = self.tile.y
             file_name = f"{channel_name}-X{x:03}-Y{y:03}{ext}"
-        elif self.tile.scan.scanner_id.startswith(Scan.Type.BZSCANNER.value):
+        elif scanner_type == Scan.Type.BZSCANNER:
             # BZScanner has channels in a specific order
             channel_name = self.tile.scan.channels[self.channel].name
             real_channel_index = list(

@@ -43,7 +43,10 @@ class Scan(yaml.YAMLObject):
         BZSCANNER = "bzscanner"
         AXIOSCAN7 = "axioscan7"
 
-    SCANNER_IDS = {"4661000426": f"{Type.AXIOSCAN7.value}_0"}
+    AXIOSCAN7_SCANNER_ID = "Scanner7"
+    """Canonical scanner ID for the Axioscan 7."""
+
+    SCANNER_IDS = {"4661000426": AXIOSCAN7_SCANNER_ID}
     """Axioscan 7 scanner IDs (service number), mapped to our scanner IDs"""
 
     METADATA_FILE_NAME = {
@@ -233,6 +236,14 @@ class Scan(yaml.YAMLObject):
         :return: a list of channel names.
         """
         return [channel.name for channel in self.channels]
+
+    def get_scanner_type(self) -> Type:
+        """Return the scanner type associated with this scan's scanner ID."""
+        if self.scanner_id == self.AXIOSCAN7_SCANNER_ID:
+            return self.Type.AXIOSCAN7
+        if self.scanner_id.startswith(self.Type.BZSCANNER.value):
+            return self.Type.BZSCANNER
+        raise ValueError(f"Scanner ID {self.scanner_id} not supported.")
 
     def get_channel_indices(self, channel_names: Iterable[str | None]) -> list[int]:
         """
@@ -783,7 +794,7 @@ class Scan(yaml.YAMLObject):
         scan = cls()
         scan.slide_id = slide_id
         if scanner_type == cls.Type.AXIOSCAN7:
-            scan.scanner_id = f"{cls.Type.AXIOSCAN7.value}_placeholder"
+            scan.scanner_id = cls.AXIOSCAN7_SCANNER_ID
             scan.roi = [cls.ROI() for _ in range(n_roi + 1)]
             scan.roi[0].tile_rows = 17
             scan.roi[0].tile_cols = (n_tile // 17) + 1

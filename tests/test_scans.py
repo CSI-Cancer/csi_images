@@ -12,7 +12,8 @@ def test_from_yaml():
     assert scan.start_datetime != ""
     assert scan.end_datetime != ""
     assert scan.scan_time_s > 0
-    assert scan.scanner_id != ""
+    assert scan.scanner_id == "Scanner7"
+    assert scan.get_scanner_type() == Scan.Type.AXIOSCAN7
     assert scan.tray_pos != ""
     assert scan.slide_pos != ""
     assert scan.camera != ""
@@ -70,6 +71,7 @@ def test_from_txt():
     assert scan.end_datetime != ""
     assert scan.scan_time_s > 0
     assert scan.scanner_id != ""
+    assert scan.get_scanner_type() == Scan.Type.BZSCANNER
     assert scan.tray_pos != ""
     assert scan.slide_pos != ""
     # assert scan.camera != ""  # Unclear
@@ -122,3 +124,11 @@ def test_names_and_indices():
 def test_image_size():
     scan = Scan.load_yaml("tests/data")
     assert scan.get_image_size() == (2020, 2020)
+
+
+def test_axioscan7_scanner_id_mapping_and_placeholder():
+    assert Scan.SCANNER_IDS["4661000426"] == "Scanner7"
+
+    scan = Scan.make_placeholder("slide", scanner_type=Scan.Type.AXIOSCAN7)
+    assert scan.scanner_id == "Scanner7"
+    assert scan.get_scanner_type() == Scan.Type.AXIOSCAN7

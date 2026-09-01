@@ -124,9 +124,10 @@ class Event:
         scan_position = np.array([[scan_position[0]], [scan_position[1]], [1]])
 
         # Multiply by the appropriate homogeneous matrix
-        if self.tile.scan.scanner_id.startswith(self.tile.scan.Type.AXIOSCAN7.value):
+        scanner_type = self.tile.scan.get_scanner_type()
+        if scanner_type == self.tile.scan.Type.AXIOSCAN7:
             transform = self.SCAN_TO_SLIDE_TRANSFORM[self.tile.scan.Type.AXIOSCAN7]
-        elif self.tile.scan.scanner_id.startswith(self.tile.scan.Type.BZSCANNER.value):
+        elif scanner_type == self.tile.scan.Type.BZSCANNER:
             transform = self.SCAN_TO_SLIDE_TRANSFORM[self.tile.scan.Type.BZSCANNER]
         else:
             raise ValueError(f"Scanner type {self.tile.scan.scanner_id} not supported.")
